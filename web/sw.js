@@ -1,13 +1,13 @@
 /*
  * 3wordPasGen のオフライン用 Service Worker
  *
- * - 初回に下のファイルを iPad（ブラウザ）の中に保存し、以後は保存した物だけを使う。
+ * - 初回に下のファイルを端末（ブラウザ）の中に保存し、以後は保存した物だけを使う。
  * - ネットからの再読み込みはしないので、機内モードでも動く。
  *   また、公開中のページが後から書き換えられても、保存済みの物は変わらない。
  * - アプリを更新したときは CACHE_VERSION の数字を上げる。
  *   ブラウザは sw.js の変更を検知したときだけ、新しいファイルを保存し直す。
  */
-const CACHE_VERSION = "3wordpasgen-v1";
+const CACHE_VERSION = "3wordpasgen-v2";
 
 const FILES = [
   "./3wordPasGen.html",

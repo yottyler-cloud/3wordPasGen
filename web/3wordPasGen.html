@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- 通信禁止：このページは外部への通信・外部ファイルの読み込みを一切行わない -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JS23u/DwKIYXHdLOwg7xteAoGhyDO3REf1mz/0Htqnk='; style-src 'sha256-L/Sqk7aO7BGftZTkVvtUammIgtZzkUuDma0seeI9UUs='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JS23u/DwKIYXHdLOwg7xteAoGhyDO3REf1mz/0Htqnk='; style-src 'sha256-hCQW5zBY5gfAgJMz9BTFbR5018bu6LJPrkh+EvwOFFI='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="format-detection" content="telephone=no">
@@ -98,21 +98,22 @@ button:active { opacity: .6; }
 button.primary { background: var(--accent); color: var(--accent-text); }
 .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   padding: 12px 16px;
 }
 .row .label { white-space: nowrap; }
 .row .pw {
-  flex: 1;
-  min-width: 0;
+  flex: 1 0 auto;
   font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: 19px;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
   -webkit-user-select: all;
   user-select: all;
 }
-.row button { white-space: nowrap; }
+/* 幅が足りないとき（iPhone など）はコピーボタンを次の行の右端へ */
+.row button { white-space: nowrap; margin-left: auto; }
 .status {
   color: var(--muted);
   margin: 0 4px;
