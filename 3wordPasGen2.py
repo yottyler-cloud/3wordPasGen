@@ -154,6 +154,7 @@ def test_vectors(inputs, iterations):
 # 4. Pythonista の画面
 # ----------------------------
 def run_app():
+    """ブラウザ版（web/3wordPasGen2.html）に近い画面"""
     import ui
     import clipboard
     from objc_util import ObjCClass
@@ -161,112 +162,349 @@ def run_app():
     NSMutableAttributedString = ObjCClass('NSMutableAttributedString')
     UIFont = ObjCClass('UIFont')
     UIColor = ObjCClass('UIColor')
-    state = {'length': DEFAULT_LENGTH}
 
-    def set_colored_text(textview, pw_text):
-        """数字: 青, 小文字: 赤, その他: 黒"""
-        attr_str = NSMutableAttributedString.alloc().initWithString_(pw_text)
-        font = UIFont.systemFontOfSize_(18)
-        attr_str.addAttribute_value_range_('NSFont', font, (0, len(pw_text)))
-        for i, char in enumerate(pw_text):
-            color = UIColor.blackColor()
-            if char.isdigit():
-                color = UIColor.blueColor()
-            elif char.islower():
-                color = UIColor.redColor()
-            attr_str.addAttribute_value_range_('NSColor', color, (i, 1))
+    # --- 色（ブラウザ版のライト表示と同じ） ---
+    BG = '#eaf6ee'
+    CARD = '#ffffff'
+    TEXT = '#1c1c1e'
+    MUTED = '#6e7c73'
+    LINE = '#d1ddd5'
+    ACCENT = '#178a4a'
+    BUTTON = '#dcefe2'
+    DANGER = '#d70015'
+    CLEAR = (0, 0, 0, 0)
+    PIN_MASK = '●' * 10   # 暗証番号の伏せ字は、文字数に関係なく常に10個
+
+    def uicolor(hex_color):
+        r, g, b = (int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5))
+        return UIColor.colorWithRed_green_blue_alpha_(r, g, b, 1.0)
+
+    COLOR_TEXT = uicolor(TEXT)
+    COLOR_DIGIT = uicolor('#0040dd')
+    COLOR_LOWER = uicolor('#e0001b')
+    PW_FONT = UIFont.fontWithName_size_('Menlo', 19) or UIFont.systemFontOfSize_(19)
+
+    state = {
+        'length': DEFAULT_LENGTH,
+        'seed': '',
+        'site': '',
+        'pin_visible': False,
+        'pw': {'pw_symbols': '', 'pw_nosymbols': ''},
+        'visible': {'pw_symbols': False, 'pw_nosymbols': False},
+    }
+
+    def eye_image(visible):
+        """目のマーク（表示中は斜線入り）。アイコンが無ければ None"""
+        try:
+            return ui.Image.named('iob:eye_disabled_24' if visible else 'iob:eye_24')
+        except Exception:
+            return None
+
+    def set_eye(button, visible):
+        image = eye_image(visible)
+        if image is not None:
+            button.image = image
+            button.title = ''
+        else:
+            button.title = '隠す' if visible else '表示'
+
+    # --- パスワードの表示（伏せ字は●、表示中は数字を青・小文字を赤） ---
+    def set_password_text(textview, text, colored):
+        attr_str = NSMutableAttributedString.alloc().initWithString_(text)
+        if text:
+            attr_str.addAttribute_value_range_('NSFont', PW_FONT, (0, len(text)))
+            for i, char in enumerate(text):
+                color = COLOR_TEXT
+                if colored and char in '23456789':
+                    color = COLOR_DIGIT
+                elif colored and 'a' <= char <= 'z':
+                    color = COLOR_LOWER
+                attr_str.addAttribute_value_range_('NSColor', color, (i, 1))
         textview.objc_instance.setAttributedText_(attr_str)
 
-    def update_site_preview(sender=None):
-        site = normalize_site(view['site'].text)
-        view['site_preview'].text = f'使う表記: {site}' if site else ''
+    def render(name):
+        pw = state['pw'][name]
+        visible = state['visible'][name]
+        if not pw:
+            set_password_text(view[name], '', False)
+        elif visible:
+            set_password_text(view[name], pw, True)
+        else:
+            set_password_text(view[name], '●' * len(pw), False)
 
-    def generate_passwords(sender):
+    def set_visible(name, visible):
+        state['visible'][name] = visible
+        set_eye(view['eye_' + name], visible)
+        render(name)
+
+    def set_status(text, error=False):
+        view['status'].text = text
+        view['status'].text_color = DANGER if error else MUTED
+
+    def clear_passwords():
+        for name in state['pw']:
+            state['pw'][name] = ''
+            set_visible(name, False)
+        state['seed'] = ''
+        state['site'] = ''
+
+    # --- 暗証番号（本物の文字は透明にして、●10個を重ねて表示する） ---
+    def update_pin():
+        pin_field = view['pin']
+        hidden = not state['pin_visible']
+        pin_field.text_color = CLEAR if hidden else TEXT
+        pin_field.tint_color = CLEAR if hidden else ACCENT   # カーソル位置からも文字数が分からないように
+        view['pin_mask'].hidden = not (hidden and pin_field.text)
+        set_eye(view['eye_pin'], state['pin_visible'])
+
+    def toggle_pin(sender):
+        state['pin_visible'] = not state['pin_visible']
+        update_pin()
+
+    # --- サイト名：実際に使う表記をその場で表示 ---
+    def update_site_preview():
+        site = normalize_site(view['site'].text)
+        view['site_preview'].text = (f'使う表記: {site}' if site
+                                     else '小文字にそろえ、https:// ・ www. ・ / 以降は取り除いて使います')
+
+    # --- 生成 ---
+    def show_passwords():
+        for name, use_symbols in (('pw_symbols', True), ('pw_nosymbols', False)):
+            state['pw'][name] = password_from_seed(state['seed'], use_symbols, state['length'])
+            render(name)
+        set_status(f'「{state["site"]}」用・{state["length"]}文字で生成しました')
+
+    def generate(sender=None):
+        for name in FIELD_ORDER:
+            view[name].end_editing()
         pin = normalize_text(view['pin'].text)
         keywords = [normalize_text(view[f'kw{i}'].text) for i in range(1, 4)]
         site = normalize_site(view['site'].text)
-        update_site_preview()
+        clear_passwords()
         try:
-            seed = make_seed(pin, keywords, site)
-            for name, use_symbols in (('pw_symbols', True), ('pw_nosymbols', False)):
-                pw = password_from_seed(seed, use_symbols, state['length'])
-                set_colored_text(view[name], pw)
-                view[name].password_raw = pw
-            view['status'].text = f'生成しました（{site}・{state["length"]}文字）'
+            state['seed'] = make_seed(pin, keywords, site)
         except ValueError as e:
-            view['status'].text = str(e)
-
-    def copy_password(sender):
-        target_name = 'pw_symbols' if sender.name == 'copy_symbols' else 'pw_nosymbols'
-        pw = getattr(view[target_name], 'password_raw', None)
-        if pw:
-            clipboard.set(pw)
-            view['status'].text = f'{sender.title} をコピーしました'
-        else:
-            view['status'].text = '先に生成してください'
+            set_status(str(e), error=True)
+            return
+        state['site'] = site
+        show_passwords()
 
     def set_length(sender):
         state['length'] = LENGTHS[sender.selected_index]
+        if state['seed']:
+            show_passwords()
 
-    def reset_fields(sender):
-        for name in ('pin', 'kw1', 'kw2', 'kw3', 'site'):
+    def copy_password(sender):
+        name = sender.name.replace('copy_', '')
+        pw = state['pw'][name]
+        if not pw:
+            set_status('先に生成してください')
+            return
+        clipboard.set(pw)
+        kind = '記号あり' if name == 'pw_symbols' else '記号なし'
+        set_status(f'{kind}（{state["site"]}・{state["length"]}文字）をコピーしました')
+
+    def copy_keywords(sender):
+        values = [view[f'kw{i}'].text for i in range(1, 4)]
+        site = normalize_site(view['site'].text)
+        if not any(values) and not site:
+            set_status('先にキーワードを入力してください')
+            return
+        clipboard.set('\n'.join(values + [site]))
+        set_status('キーワード3つとサイト名をコピーしました（暗証番号は含みません）')
+
+    def reset(sender):
+        for name in FIELD_ORDER:
             view[name].text = ''
-        for name in ('pw_symbols', 'pw_nosymbols'):
-            view[name].text = ''
-            view[name].password_raw = ''
-        view['site_preview'].text = ''
-        view['status'].text = 'リセットしました'
+            view[name].end_editing()
+        state['pin_visible'] = False
+        update_pin()
+        clear_passwords()
+        update_site_preview()
+        state['length'] = DEFAULT_LENGTH
+        view['length'].selected_index = LENGTHS.index(DEFAULT_LENGTH)
+        set_status('リセットしました')
 
-    view = ui.View(name='パスワード生成（新方式）', bg_color='white', frame=(0, 0, 400, 600))
+    # --- 入力欄の動き ---
+    FIELD_ORDER = ['pin', 'kw1', 'kw2', 'kw3', 'site']
 
-    fields = [('pin', '暗証番号（4文字以上）')] + [(f'kw{i}', f'キーワード{i}') for i in range(1, 4)] \
-        + [('site', 'サイト名（例: amazon.co.jp）')]
-    for i, (name, placeholder) in enumerate(fields):
-        tf = ui.TextField(name=name, placeholder=placeholder, frame=(20, 20 + i * 50, 360, 40))
-        tf.border_width = 1
+    class FieldDelegate(object):
+        def textfield_did_change(self, textfield):
+            if textfield.name == 'pin':
+                update_pin()
+            if textfield.name == 'site':
+                update_site_preview()
+            # 入力を変えたら、古い入力で作ったパスワードは消す（別サイト用を取り違えないように）
+            if state['seed']:
+                clear_passwords()
+                set_status('入力が変わったので、もう一度「生成」してください')
+
+        def textfield_should_return(self, textfield):
+            # Enter で次の欄へ、最後の欄なら生成
+            i = FIELD_ORDER.index(textfield.name)
+            if i < len(FIELD_ORDER) - 1:
+                view[FIELD_ORDER[i + 1]].begin_editing()
+            else:
+                generate()
+            return True
+
+    delegate = FieldDelegate()
+
+    # --- 画面の組み立て ---
+    width = min(540, ui.get_screen_size()[0])
+    pad = 16
+    card_w = width - pad * 2
+    root = ui.View(name='パスワード生成（新方式）', bg_color=BG, frame=(0, 0, width, 760))
+    scroll = ui.ScrollView(frame=root.bounds, flex='WH', bg_color=BG)
+    root.add_subview(scroll)
+    y = [16]
+
+    def add(sub):
+        scroll.add_subview(sub)
+        return sub
+
+    def label(text, frame, size=17, color=TEXT, bold=False, align=ui.ALIGN_LEFT, parent=None, name=None):
+        lb = ui.Label(frame=frame, text=text, text_color=color, alignment=align)
+        if name:
+            lb.name = name
+        lb.font = ('<system-bold>' if bold else '<system>', size)
+        lb.number_of_lines = 0
+        (parent or scroll).add_subview(lb)
+        return lb
+
+    def card(height):
+        c = add(ui.View(frame=(pad, y[0], card_w, height), bg_color=CARD))
+        c.corner_radius = 14
+        y[0] += height + 18
+        return c
+
+    def separator(parent, top):
+        parent.add_subview(ui.View(frame=(0, top, card_w, 1), bg_color=LINE))
+
+    def section(text):
+        label(text, (pad + 12, y[0], card_w - 12, 20), size=13, color=MUTED)
+        y[0] += 26
+
+    def field(parent, name, placeholder, top, right_space=0):
+        tf = ui.TextField(name=name, frame=(16, top, card_w - 32 - right_space, 52), placeholder=placeholder)
+        tf.bordered = False
+        tf.bg_color = CARD
+        tf.text_color = TEXT
+        tf.font = ('<system>', 17)
         tf.autocapitalization_type = ui.AUTOCAPITALIZE_NONE
         tf.autocorrection_type = False
         tf.spellchecking_type = False
-        if name == 'pin':
-            tf.secure = True
-        if name == 'site':
-            tf.action = update_site_preview
-        view.add_subview(tf)
+        tf.delegate = delegate
+        parent.add_subview(tf)
+        return tf
 
-    preview = ui.Label(name='site_preview', frame=(20, 265, 360, 24))
-    preview.text_color = 'gray'
-    view.add_subview(preview)
+    def button(parent, title, frame, action, primary=False, name=None):
+        b = ui.Button(frame=frame, title=title)
+        if name:
+            b.name = name
+        b.bg_color = ACCENT if primary else BUTTON
+        b.tint_color = '#ffffff' if primary else ACCENT
+        b.corner_radius = frame[3] / 2
+        b.font = ('<system>', 17)
+        b.action = action
+        parent.add_subview(b)
+        return b
 
-    seg = ui.SegmentedControl(frame=(20, 295, 360, 32))
-    seg.segments = [f'{n}文字' for n in LENGTHS]
+    # 見出し
+    label('パスワード生成', (pad + 4, y[0], 230, 40), size=30, bold=True)
+    badge = label('新方式', (pad + 236, y[0] + 8, 64, 26), size=14, color='#ffffff', bold=True, align=ui.ALIGN_CENTER)
+    badge.bg_color = ACCENT
+    badge.corner_radius = 6
+    y[0] += 46
+    label('暗証番号 ＋ キーワード3つ ＋ サイト名。現行方式とは別のパスワードになります。',
+          (pad + 4, y[0], card_w - 8, 40), size=14, color=MUTED)
+    y[0] += 50
+
+    # 暗証番号
+    section('暗証番号（全サイト共通・4文字以上・数字以外も可）')
+    c = card(52)
+    field(c, 'pin', '暗証番号', 0, right_space=48)
+    mask = label(PIN_MASK, (16, 0, card_w - 80, 52), size=17, parent=c, name='pin_mask')
+    mask.touch_enabled = False
+    mask.hidden = True
+    button(c, '', (card_w - 50, 6, 40, 40), toggle_pin, name='eye_pin')
+
+    # キーワード
+    section('キーワード')
+    c = card(52 * 3 + 2)
+    for i in range(3):
+        field(c, f'kw{i + 1}', f'キーワード{i + 1}', i * 53)
+        if i:
+            separator(c, i * 53 - 1)
+
+    # サイト名
+    section('サイト名（URL を貼り付けても OK）')
+    c = card(52 + 1 + 40 + 1 + 56)
+    field(c, 'site', '例: amazon.co.jp', 0)
+    separator(c, 52)
+    label('', (16, 53, card_w - 32, 40), size=14, color=MUTED, parent=c, name='site_preview')
+    separator(c, 93)
+    button(c, 'キーワード・サイト名をコピー', (card_w - 16 - 260, 94 + 8, 260, 40), copy_keywords)
+
+    # 文字数
+    c = card(56)
+    label('文字数', (16, 0, 100, 56), parent=c)
+    seg = ui.SegmentedControl(name='length', frame=(card_w - 16 - 180, 12, 180, 32))
+    seg.segments = [str(n) for n in LENGTHS]
     seg.selected_index = LENGTHS.index(DEFAULT_LENGTH)
+    seg.tint_color = ACCENT
     seg.action = set_length
-    view.add_subview(seg)
+    c.add_subview(seg)
 
-    btn = ui.Button(title='生成', frame=(80, 340, 100, 40), bg_color='#e1f5fe')
-    btn.action = generate_passwords
-    view.add_subview(btn)
+    # 生成・リセット
+    c = card(68)
+    half = (card_w - 16 * 2 - 12) / 2
+    button(c, '生成', (16, 12, half, 44), generate, primary=True)
+    button(c, 'リセット', (16 + half + 12, 12, half, 44), reset)
 
-    reset_btn = ui.Button(title='リセット', frame=(220, 340, 100, 40), bg_color='#f5f5f5')
-    reset_btn.action = reset_fields
-    view.add_subview(reset_btn)
+    # 結果
+    c = card(96 * 2 + 1)
+    for i, (name, title) in enumerate((('pw_symbols', '記号あり:'), ('pw_nosymbols', '記号なし:'))):
+        top = i * 97
+        if i:
+            separator(c, top - 1)
+        label(title, (16, top + 8, 120, 40), parent=c)
+        button(c, '', (card_w - 16 - 90 - 10 - 40, top + 8, 40, 40),
+               lambda sender, n=name: set_visible(n, not state['visible'][n]), name='eye_' + name)
+        button(c, 'コピー', (card_w - 16 - 90, top + 8, 90, 40), copy_password, name='copy_' + name)
+        tv = ui.TextView(name=name, frame=(12, top + 50, card_w - 24, 40), editable=False, scroll_enabled=False)
+        tv.bg_color = CARD
+        c.add_subview(tv)
 
-    for i, (name, copy_name, title) in enumerate((
-            ('pw_symbols', 'copy_symbols', '記号ありコピ'),
-            ('pw_nosymbols', 'copy_nosymbols', '記号なしコピ'))):
-        tv = ui.TextView(name=name, frame=(20, 400 + i * 50, 260, 40), editable=False, scroll_enabled=False)
-        tv.border_width = 0.5
-        tv.border_color = '#cccccc'
-        view.add_subview(tv)
-        cb = ui.Button(name=copy_name, title=title, frame=(290, 405 + i * 50, 90, 30), bg_color='#eeeeee')
-        cb.action = copy_password
-        view.add_subview(cb)
+    # 状態表示・注記
+    label('', (pad + 4, y[0] - 8, card_w - 8, 44), size=15, color=MUTED, name='status')
+    y[0] += 44
+    label('今まで作ったパスワードは 3wordPasGen.py（現行方式）で作れます。',
+          (pad + 4, y[0], card_w - 8, 40), size=14, color=MUTED)
+    y[0] += 56
+    scroll.content_size = (width, y[0])
 
-    status = ui.Label(name='status', frame=(20, 510, 360, 30), alignment=ui.ALIGN_CENTER)
-    status.text_color = 'gray'
-    view.add_subview(status)
+    # 部品を名前で取り出せるよう、カードの中もまとめて登録
+    named = {}
 
-    view.present('sheet')
+    def collect(v):
+        for sub in v.subviews:
+            if sub.name:
+                named[sub.name] = sub
+            collect(sub)
+
+    collect(scroll)
+
+    class Finder(object):
+        def __getitem__(self, key):
+            return named[key]
+
+    view = Finder()
+    update_pin()
+    update_site_preview()
+    for name in state['pw']:
+        set_visible(name, False)
+    root.present('sheet')
 
 
 if __name__ == '__main__':
