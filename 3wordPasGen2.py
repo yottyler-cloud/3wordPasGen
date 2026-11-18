@@ -193,17 +193,26 @@ def run_app():
         'visible': {'pw_symbols': False, 'pw_nosymbols': False},
     }
 
+    eye_icons = {}   # 目のマークのボタン名 → アイコンを表示する ImageView
+
     def eye_image(visible):
         """目のマーク（表示中は斜線入り）。アイコンが無ければ None"""
         try:
-            return ui.Image.named('iob:eye_disabled_24' if visible else 'iob:eye_24')
+            image = ui.Image.named('iob:eye_disabled_24' if visible else 'iob:eye_24')
         except Exception:
             return None
+        try:
+            image = image.with_rendering_mode(ui.RENDERING_MODE_TEMPLATE)  # 緑で表示するため
+        except Exception:
+            pass
+        return image
 
     def set_eye(button, visible):
+        # ボタン自体には文字も画像も入れず、上に重ねた ImageView でアイコンを出す
+        # （ボタンに画像を入れると、Pythonista では横に「…」が出てしまうため）
         image = eye_image(visible)
         if image is not None:
-            button.image = image   # 文字は設定しない（空の文字でも「…」と出てしまうため）
+            eye_icons[button.name].image = image
         else:
             button.title = '隠す' if visible else '表示'
 
@@ -398,6 +407,15 @@ def run_app():
     def separator(parent, top):
         parent.add_subview(ui.View(frame=(0, top, card_w, 1), bg_color=LINE))
 
+    def eye_button(parent, frame, action, name):
+        b = button(parent, '', frame, action, name=name)
+        icon = ui.ImageView(frame=((frame[2] - 24) / 2, (frame[3] - 24) / 2, 24, 24))
+        icon.touch_enabled = False
+        icon.tint_color = ACCENT
+        b.add_subview(icon)
+        eye_icons[name] = icon
+        return b
+
     def section(text):
         label(text, (pad + 12, y[0], card_w - 12, 20), size=13, color=MUTED)
         y[0] += 26
@@ -447,7 +465,7 @@ def run_app():
     mask = label(PIN_MASK, (16, 0, card_w - 80, 52), size=17, parent=c, name='pin_mask')
     mask.touch_enabled = False
     mask.hidden = True
-    button(c, '', (card_w - 58, 4, 48, 44), toggle_pin, name='eye_pin')
+    eye_button(c, (card_w - 58, 4, 48, 44), toggle_pin, 'eye_pin')
 
     # キーワード
     section('キーワード')
@@ -489,8 +507,8 @@ def run_app():
         if i:
             separator(c, top - 1)
         label(title, (16, top + 8, 120, 40), parent=c)
-        button(c, '', (card_w - 16 - 90 - 10 - 48, top + 6, 48, 44),
-               lambda sender, n=name: set_visible(n, not state['visible'][n]), name='eye_' + name)
+        eye_button(c, (card_w - 16 - 90 - 10 - 48, top + 6, 48, 44),
+                   lambda sender, n=name: set_visible(n, not state['visible'][n]), 'eye_' + name)
         button(c, 'コピー', (card_w - 16 - 90, top + 8, 90, 40), copy_password, name='copy_' + name)
         tv = ui.TextView(name=name, frame=(12, top + 50, card_w - 24, 40), editable=False, scroll_enabled=False)
         tv.bg_color = CARD
