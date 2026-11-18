@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- 通信禁止：このページは外部への通信・外部ファイルの読み込みを一切行わない -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-l/AcnU+u10EgSPG7qbTykvgDvZz1CO2Tabvyp+fesIs='; style-src 'sha256-6PKBn2MSm+r9EOIdsw8b4T4NSnljVLghKXEwLtTz1hg='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-xvtxXeKyTCFkf9pSPAYMjMeUTwihd00QB613Oj5Rgo0='; style-src 'sha256-g7G/CcoHMDZ9Ydezzf4LeBihYT7Zoh+SC/pe7yPbulc='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="format-detection" content="telephone=no">
@@ -28,6 +28,8 @@
   --button: #e5e5ea;
   --danger: #d70015;
   --digit: #e0001b;
+  --seg-selected: #ffffff;
+  --seg-selected-text: #0a84ff;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -41,6 +43,8 @@
     --button: #2c2c2e;
     --danger: #ff453a;
     --digit: #ff5c52;
+    --seg-selected: #636366;
+    --seg-selected-text: #ffffff;
   }
 }
 * { box-sizing: border-box; }
@@ -99,23 +103,68 @@ button:active { opacity: .6; }
 .actions button { flex: 1; padding: 10px 18px; }
 button.primary { background: var(--accent); color: var(--accent-text); }
 .row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  grid-template-areas: "label pw eye copy";
   align-items: center;
   gap: 8px 12px;
   padding: 12px 16px;
 }
-.row .label { white-space: nowrap; }
+.row .label { grid-area: label; white-space: nowrap; }
 .row .pw {
-  flex: 1 0 auto;
+  grid-area: pw;
   font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: 19px;
   white-space: nowrap;
   -webkit-user-select: all;
   user-select: all;
 }
-/* 幅が足りないとき（iPhone など）はコピーボタンを次の行の右端へ */
-.row button { white-space: nowrap; margin-left: auto; }
+.row .eye { grid-area: eye; }
+.row .copy { grid-area: copy; white-space: nowrap; }
+/* 幅が足りないとき（iPhone など）はパスワードを2行目に */
+@media (max-width: 600px) {
+  .row { grid-template-areas: "label . eye copy" "pw pw pw pw"; }
+  .row .pw { font-size: 18px; }
+}
+button.eye {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+button.eye svg { width: 22px; height: 22px; }
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+}
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--button);
+}
+.segmented button {
+  padding: 6px 18px;
+  background: transparent;
+  color: var(--text);
+}
+.segmented button[aria-pressed="true"] {
+  background: var(--seg-selected);
+  color: var(--seg-selected-text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+}
+.keyword-tools {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 16px;
+}
 .status {
   color: var(--muted);
   margin: 0 4px;
@@ -143,6 +192,20 @@ button.primary { background: var(--accent); color: var(--accent-text); }
     <input id="kw1" placeholder="キーワード1" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <input id="kw2" placeholder="キーワード2" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <input id="kw3" placeholder="キーワード3" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+    <div class="keyword-tools">
+      <button type="button" id="copy_keywords">キーワード一括コピー</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="option">
+      <span>文字数</span>
+      <div class="segmented" role="group" aria-label="文字数">
+        <button type="button" data-length="12" aria-pressed="true">12</button>
+        <button type="button" data-length="16" aria-pressed="false">16</button>
+        <button type="button" data-length="20" aria-pressed="false">20</button>
+      </div>
+    </div>
   </div>
 
   <div class="card">
@@ -156,12 +219,14 @@ button.primary { background: var(--accent); color: var(--accent-text); }
     <div class="row">
       <span class="label">記号あり:</span>
       <span class="pw" id="pw_symbols"></span>
-      <button type="button" id="copy_symbols">記号ありコピー</button>
+      <button type="button" class="eye" id="eye_symbols" aria-label="パスワードを表示" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="icon-show"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="icon-hide" hidden><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
+      <button type="button" class="copy" id="copy_symbols">コピー</button>
     </div>
     <div class="row">
       <span class="label">記号なし:</span>
       <span class="pw" id="pw_nosymbols"></span>
-      <button type="button" id="copy_nosymbols">記号なしコピー</button>
+      <button type="button" class="eye" id="eye_nosymbols" aria-label="パスワードを表示" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="icon-show"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="icon-hide" hidden><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
+      <button type="button" class="copy" id="copy_nosymbols">コピー</button>
     </div>
   </div>
 
@@ -488,14 +553,27 @@ const ThreeWordPasGen = (() => {
 if (typeof document !== "undefined") {
   const $ = (id) => document.getElementById(id);
   const inputs = [$("kw1"), $("kw2"), $("kw3")];
-  const passwords = { pw_symbols: "", pw_nosymbols: "" };
+  const DEFAULT_LENGTH = 12;
+  const rows = {
+    pw_symbols: { useSymbols: true, name: "記号あり", password: "", visible: false, eye: $("eye_symbols") },
+    pw_nosymbols: { useSymbols: false, name: "記号なし", password: "", visible: false, eye: $("eye_nosymbols") },
+  };
+  const lengthButtons = Array.from(document.querySelectorAll(".segmented button"));
+  let length = DEFAULT_LENGTH;
 
   const setStatus = (text) => { $("status").textContent = text; };
 
-  // パスワードを表示（数字だけ赤くする。コピーされる文字列は変わらない）
-  function showPassword(element, password) {
+  // パスワードを表示（伏せ字のときは●、表示中は数字だけ赤くする。コピーされる文字列は変わらない）
+  function render(id) {
+    const row = rows[id];
+    const element = $(id);
     element.textContent = "";
-    for (const ch of password) {
+    if (!row.password) return;
+    if (!row.visible) {
+      element.textContent = "●".repeat(Array.from(row.password).length);
+      return;
+    }
+    for (const ch of row.password) {
       if (ch >= "0" && ch <= "9") {
         const span = document.createElement("span");
         span.className = "digit";
@@ -507,14 +585,32 @@ if (typeof document !== "undefined") {
     }
   }
 
-  // 生成ボタン処理
+  // 目のマーク：表示 / 伏せ字の切り替え
+  function setVisible(id, visible) {
+    const row = rows[id];
+    row.visible = visible;
+    row.eye.setAttribute("aria-pressed", String(visible));
+    row.eye.setAttribute("aria-label", visible ? "パスワードを隠す" : "パスワードを表示");
+    // SVG には .hidden プロパティが無いので属性で切り替える
+    row.eye.querySelector(".icon-show").toggleAttribute("hidden", visible);
+    row.eye.querySelector(".icon-hide").toggleAttribute("hidden", !visible);
+    render(id);
+  }
+
+  // 生成処理（文字数は選択中のもの）
   function generatePasswords() {
     const keywords = inputs.map((input) => ThreeWordPasGen.normalizeKeyword(input.value));
-    passwords.pw_symbols = ThreeWordPasGen.generatePassword(keywords, true);
-    passwords.pw_nosymbols = ThreeWordPasGen.generatePassword(keywords, false);
-    showPassword($("pw_symbols"), passwords.pw_symbols);
-    showPassword($("pw_nosymbols"), passwords.pw_nosymbols);
-    setStatus("");
+    for (const [id, row] of Object.entries(rows)) {
+      row.password = ThreeWordPasGen.generatePassword(keywords, row.useSymbols, length);
+      render(id);
+    }
+  }
+
+  // 文字数の切り替え（生成済みなら同じキーワードで作り直す）
+  function setLength(newLength) {
+    length = newLength;
+    lengthButtons.forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.length) === length)));
+    if (rows.pw_symbols.password) generatePasswords();
   }
 
   // クリップボードへコピー（使えない環境では従来の方法で）
@@ -539,31 +635,52 @@ if (typeof document !== "undefined") {
     return ok;
   }
 
-  // コピー処理（共通）
-  async function copyPassword(labelId, button) {
-    const pw = passwords[labelId];
-    if (!pw) {
+  // パスワードのコピー（伏せ字のままでも本物のパスワードがコピーされる）
+  async function copyPassword(id) {
+    const row = rows[id];
+    if (!row.password) {
       setStatus("先に生成してください");
       return;
     }
-    const ok = await writeClipboard(pw);
-    setStatus(ok ? `${button.textContent} をコピーしました` : "コピーできませんでした");
+    const ok = await writeClipboard(row.password);
+    setStatus(ok ? `${row.name}（${length}文字）をコピーしました` : "コピーできませんでした");
   }
 
-  // リセット処理
+  // キーワード一括コピー（入力したまま、1行に1つずつ）
+  async function copyKeywords() {
+    const values = inputs.map((input) => input.value);
+    if (values.every((v) => v === "")) {
+      setStatus("先にキーワードを入力してください");
+      return;
+    }
+    const ok = await writeClipboard(values.join("\n"));
+    setStatus(ok ? "キーワード3つをコピーしました" : "コピーできませんでした");
+  }
+
+  // リセット処理（文字数も 12 に戻し、伏せ字に戻す）
   function resetFields() {
     inputs.forEach((input) => { input.value = ""; });
-    passwords.pw_symbols = "";
-    passwords.pw_nosymbols = "";
-    $("pw_symbols").textContent = "";
-    $("pw_nosymbols").textContent = "";
+    for (const [id, row] of Object.entries(rows)) {
+      row.password = "";
+      setVisible(id, false);
+    }
+    setLength(DEFAULT_LENGTH);
     setStatus("リセットしました");
   }
 
-  $("generate").addEventListener("click", generatePasswords);
+  $("generate").addEventListener("click", () => {
+    generatePasswords();
+    setVisible("pw_symbols", false);
+    setVisible("pw_nosymbols", false);
+    setStatus("");
+  });
   $("reset").addEventListener("click", resetFields);
-  $("copy_symbols").addEventListener("click", (e) => copyPassword("pw_symbols", e.currentTarget));
-  $("copy_nosymbols").addEventListener("click", (e) => copyPassword("pw_nosymbols", e.currentTarget));
+  $("copy_keywords").addEventListener("click", copyKeywords);
+  for (const id of Object.keys(rows)) {
+    rows[id].eye.addEventListener("click", () => setVisible(id, !rows[id].visible));
+    $(id.replace("pw_", "copy_")).addEventListener("click", () => copyPassword(id));
+  }
+  lengthButtons.forEach((b) => b.addEventListener("click", () => setLength(Number(b.dataset.length))));
 
   // Enter キーで次の入力欄へ、最後の欄なら生成
   inputs.forEach((input, i) => {
@@ -571,7 +688,7 @@ if (typeof document !== "undefined") {
       if (e.key !== "Enter" || e.isComposing) return;
       e.preventDefault();
       if (i < inputs.length - 1) inputs[i + 1].focus();
-      else { input.blur(); generatePasswords(); }
+      else { input.blur(); $("generate").click(); }
     });
   });
 
