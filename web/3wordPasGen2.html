@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- 通信禁止：このページは外部への通信・外部ファイルの読み込みを一切行わない -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ezOnBBIuAuFSfCV0loQSAkf6nWfRC+dFI9zZhntfNSU='; style-src 'sha256-z6PVW9L+qAs8azW9OMruCE9I/ERIBAE1o1DS/PxCfTQ='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-AS6NOz0EflKBgwgbOIW+zfjUkd3Vxdv3u8Xg76vAuu4='; style-src 'sha256-Lp2fGdAo1tGdklE7Kebv86pKGxZSIFqwQhf93dm9WPo='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="format-detection" content="telephone=no">
@@ -113,7 +113,22 @@ input::placeholder { color: var(--muted); }
 input.secret { -webkit-text-security: disc; text-security: disc; }
 /* 表示にするときは「伏せない」をはっきり指定する（指定を外すだけだと iPad の Safari が●のままになる） */
 input.revealed { -webkit-text-security: none; text-security: none; }
+/* 伏せているあいだは本物の文字を透明にし、文字数に関係なく決まった数の●を重ねて表示する
+   （カーソル位置や選択範囲の幅からも文字数が分からないようにする） */
+input.secret { color: transparent; caret-color: transparent; }
+input.secret::selection { background: transparent; }
+.pin-mask {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text);
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
 .field {
+  position: relative;
   display: flex;
   align-items: center;
   padding-right: 8px;
@@ -245,6 +260,7 @@ button.eye svg { width: 22px; height: 22px; }
   <p class="section-title">暗証番号（全サイト共通・4文字以上・数字以外も可）</p>
   <div class="card">
     <div class="field">
+      <span class="pin-mask" id="pin_mask" aria-hidden="true" hidden></span>
       <input id="pin" class="secret" placeholder="暗証番号" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
       <button type="button" class="eye" id="eye_pin" aria-label="暗証番号を表示" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="icon-show"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="icon-hide" hidden><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
     </div>
@@ -788,6 +804,14 @@ if (typeof document !== "undefined") {
     button.querySelector(".icon-hide").toggleAttribute("hidden", !visible);
   }
 
+  // 伏せ字の●は、実際の文字数に関係なく常にこの数だけ出す（のぞき見で桁数が分からないように）
+  const PIN_MASK_DOTS = 10;
+  function updatePinMask() {
+    const mask = $("pin_mask");
+    mask.textContent = "●".repeat(PIN_MASK_DOTS);
+    mask.hidden = !pinInput.classList.contains("secret") || pinInput.value === "";
+  }
+
   // 暗証番号の表示 / 伏せ字
   function setPinVisible(visible) {
     pinInput.classList.toggle("secret", !visible);
@@ -799,6 +823,7 @@ if (typeof document !== "undefined") {
     pinInput.style.display = "";
     pinInput.value = "";
     pinInput.value = value;
+    updatePinMask();
     setEyeIcon($("eye_pin"), visible, "暗証番号");
   }
 
@@ -977,6 +1002,7 @@ if (typeof document !== "undefined") {
   }
   lengthButtons.forEach((b) => b.addEventListener("click", () => setLength(Number(b.dataset.length))));
   siteInput.addEventListener("input", updateSiteNote);
+  pinInput.addEventListener("input", updatePinMask);
 
   // 入力を変えたら、古い入力で作ったパスワードは消す（別サイト用を取り違えないように）
   allInputs.forEach((input) => input.addEventListener("input", () => {
