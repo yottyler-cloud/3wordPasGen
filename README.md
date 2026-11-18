@@ -16,12 +16,20 @@
 | パス | 内容 |
 |---|---|
 | `3wordPasGen.py` | Python 版（Pythonista 3 用） |
+| `web/3wordPasGen.html` | ブラウザ版（HTML 1枚。Safari / Chrome 用） |
 | `ios/3wordPasGen.swiftpm/` | Swift 版（SwiftUI。Swift Playgrounds / Xcode 用） |
 
 Swift 版は Python 版と**同じキーワードから同じパスワード**を生成します。
 Python の `random`（Mersenne Twister）の `seed` / `choices` / `sample` / `shuffle` を
 `PythonRandom.swift` で同じ動作になるよう移植しています。
 起動時に Python 版で生成した値と照合し、一致しない場合は画面に警告を表示します。
+
+## ブラウザ版について
+- HTML ファイル1枚だけで動きます。外部のファイルやライブラリは読み込みません。
+- ページ内の CSP（Content-Security-Policy）で、**外部への通信をすべて禁止**しています。
+- SHA-512 も自前で実装しているので、ネットに置かず、ファイルを開くだけでも動きます。
+- 起動時に Python 版で生成した値と照合し、一致しない場合は警告を出して「生成」を無効にします。
+- `<script>` や `<style>` を書き換えたら、`python3 web/update_csp.py` を実行して CSP のハッシュを更新してください（しないとページが動かなくなります）。
 
 ## 使い方（Swift 版 / iPad）
 1. `ios/3wordPasGen.swiftpm` フォルダを iPad の「ファイル」に置きます。
