@@ -8,9 +8,12 @@
   3. サイト名（必須。表記をそろえてから使う）
 
 しくみ:
-  各入力を正規化 → "3wordPasGen2" と5つの入力を NUL 区切りで連結
-  → SHA-512(16進) → random.seed() → 文字選び（現行と同じ手順）
+  各入力を正規化 → 暗証番号・キーワード3つ・サイト名を NUL 区切りで連結
+  → PBKDF2-HMAC-SHA512（ソルト "3wordPasGen2" + NUL + サイト名、210,000回、64バイト）
+  → 16進文字列 → random.seed() → 文字選び（現行と同じ手順）
   区切りを入れるので「ab」+「c」と「a」+「bc」は別のパスワードになる。
+  PBKDF2 で1回の計算を重くし、パスワードが漏れたときにキーワードを総当たりで
+  逆算されにくくしている（SHA-512 一発の現行方式より約40万倍重い）。
 
 Pythonista 以外（PC の Python など）で実行した場合は、
 画面を出さずに互換性チェック用の値を表示する。
@@ -23,6 +26,8 @@ import unicodedata
 
 VERSION_TAG = '3wordPasGen2'
 MIN_PIN_LENGTH = 4
+ITERATIONS = 210000   # PBKDF2 のくり返し回数（変えるとパスワードが変わる）
+TEST_ITERATIONS = 1000  # 互換性チェック用（起動を速くするため少なめ）
 LENGTHS = (12, 16, 20)
 DEFAULT_LENGTH = 16
 
@@ -64,18 +69,20 @@ def normalize_site(text):
 # ----------------------------
 # 2. パスワード生成ロジック
 # ----------------------------
-def make_seed(pin, keywords, site):
-    """正規化済みの入力からシード（SHA-512 の16進）を作る"""
+def make_seed(pin, keywords, site, iterations=ITERATIONS):
+    """正規化済みの入力からシード（PBKDF2-HMAC-SHA512 の16進）を作る。ここが重い計算"""
     if len(pin) < MIN_PIN_LENGTH:
         raise ValueError(f'暗証番号は{MIN_PIN_LENGTH}文字以上にしてください。')
     if not site:
         raise ValueError('サイト名を入力してください。')
-    message = '\0'.join([VERSION_TAG, pin, *keywords, site])
-    return hashlib.sha512(message.encode('utf-8')).hexdigest()
+    secret = '\0'.join([pin, *keywords, site]).encode('utf-8')
+    salt = (VERSION_TAG + '\0' + site).encode('utf-8')
+    return hashlib.pbkdf2_hmac('sha512', secret, salt, iterations, 64).hex()
 
 
-def generate_password(pin, keywords, site, use_symbols=True, length=DEFAULT_LENGTH):
-    rng = random.Random(make_seed(pin, keywords, site))
+def password_from_seed(seed, use_symbols=True, length=DEFAULT_LENGTH):
+    """シードから文字を選ぶ（現行方式と同じ手順。こちらは軽い）"""
+    rng = random.Random(seed)
 
     password_chars = []
     password_chars += rng.sample(UPPERCASE, 2)
@@ -99,6 +106,9 @@ def generate_password(pin, keywords, site, use_symbols=True, length=DEFAULT_LENG
 # ----------------------------
 # 3. 互換性チェック用の値（ブラウザ版の COMPATIBILITY_VECTORS と同じもの）
 # ----------------------------
+# 照合用（ITERATIONS 回の本番設定で計算した値。起動時に1件だけ確かめる）
+FULL_TEST_INPUT = ('1234', ['apple', 'banana', 'cherry'], 'amazon.co.jp', 16)
+
 TEST_INPUTS = [
     ('1234', ['apple', 'banana', 'cherry'], 'amazon.co.jp', 16),
     ('０９８７', ['ａｐｐｌｅ', '  banana ', 'ｶﾀｶﾅ'], 'https://www.Amazon.co.jp/gp/cart', 12),
@@ -123,14 +133,21 @@ def print_test_vectors():
     print('// サイト名の正規化')
     for s in SITE_TESTS:
         print(f'[{s!r}, {normalize_site(s)!r}],')
-    print('// パスワード')
-    for pin, kws, site, length in TEST_INPUTS:
-        p = normalize_text(pin)
-        k = [normalize_text(x) for x in kws]
-        st = normalize_site(site)
-        a = generate_password(p, k, st, True, length)
-        b = generate_password(p, k, st, False, length)
-        print(f'[{pin!r}, {kws!r}, {site!r}, {length}, {a!r}, {b!r}],')
+    for title, inputs, iterations in (
+            (f'パスワード（{TEST_ITERATIONS}回）', TEST_INPUTS, TEST_ITERATIONS),
+            (f'パスワード（本番 {ITERATIONS}回）', [FULL_TEST_INPUT], ITERATIONS)):
+        print('// ' + title)
+        for row in test_vectors(inputs, iterations):
+            print(repr(row) + ',')
+
+
+def test_vectors(inputs, iterations):
+    rows = []
+    for pin, kws, site, length in inputs:
+        seed = make_seed(normalize_text(pin), [normalize_text(x) for x in kws], normalize_site(site), iterations)
+        rows.append([pin, kws, site, length,
+                     password_from_seed(seed, True, length), password_from_seed(seed, False, length)])
+    return rows
 
 
 # ----------------------------
@@ -170,8 +187,9 @@ def run_app():
         site = normalize_site(view['site'].text)
         update_site_preview()
         try:
+            seed = make_seed(pin, keywords, site)
             for name, use_symbols in (('pw_symbols', True), ('pw_nosymbols', False)):
-                pw = generate_password(pin, keywords, site, use_symbols, state['length'])
+                pw = password_from_seed(seed, use_symbols, state['length'])
                 set_colored_text(view[name], pw)
                 view[name].password_raw = pw
             view['status'].text = f'生成しました（{site}・{state["length"]}文字）'

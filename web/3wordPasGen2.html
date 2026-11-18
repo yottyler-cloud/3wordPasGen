@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- 通信禁止：このページは外部への通信・外部ファイルの読み込みを一切行わない -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-aS/Mt9LUL9N9LN/0lliZoGTx8BEjxllqNFO6UlGrF8w='; style-src 'sha256-kNQUQ6eMe5ukOPXAJogCK8J4/QFgy3IW8x+c4cJW6fI='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-HlYmt0Zn+863YV10WUiQ0/cnpAWtLIlQh/vliON9VpY='; style-src 'sha256-kNQUQ6eMe5ukOPXAJogCK8J4/QFgy3IW8x+c4cJW6fI='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="format-detection" content="telephone=no">
@@ -307,17 +307,19 @@ button.eye svg { width: 22px; height: 22px; }
  * 3wordPasGen2（ブラウザ版・新方式）
  * 3wordPasGen2.py と同じ入力から、同じパスワードを生成する。
  * 材料: 暗証番号 + キーワード3つ + サイト名（それぞれ正規化してから NUL 区切りで連結）
+ * → PBKDF2-HMAC-SHA512（210,000回）でわざと重く計算 → Python の random で文字を選ぶ
  * 現行の 3wordPasGen.html とは結果が異なる（別方式）。
  * 外部ライブラリ・通信は一切使わない。
  */
 const PasGen2 = (() => {
-
   // ---------------------------------------------------------------
-  // UTF-8 / SHA-512（Python の hashlib.sha512 と同じ結果）
+  // UTF-8 / SHA-512 / PBKDF2-HMAC-SHA512（Python の hashlib と同じ結果）
+  // 64ビットの値は「上位32ビット・下位32ビット」の組で扱う（速さのため）
   // ---------------------------------------------------------------
   const utf8 = (text) => new TextEncoder().encode(text);
+  const toHex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 
-  const SHA512_K = [
+  const SHA512_K = Int32Array.from([
     "428a2f98d728ae22", "7137449123ef65cd", "b5c0fbcfec4d3b2f", "e9b5dba58189dbbc",
     "3956c25bf348b538", "59f111f1b605d019", "923f82a4af194f9b", "ab1c5ed5da6d8118",
     "d807aa98a3030242", "12835b0145706fbe", "243185be4ee4b28c", "550c7dc3d5ffb4e2",
@@ -338,69 +340,139 @@ const PasGen2 = (() => {
     "06f067aa72176fba", "0a637dc5a2c898a6", "113f9804bef90dae", "1b710b35131c471b",
     "28db77f523047d84", "32caab7b40c72493", "3c9ebe0a15c9bebc", "431d67c49c100d4c",
     "4cc5d4becb3e42b6", "597f299cfc657e2a", "5fcb6fab3ad6faec", "6c44198c4a475817",
-  ].map((h) => BigInt("0x" + h));
+  ].flatMap((h) => [parseInt(h.slice(0, 8), 16) | 0, parseInt(h.slice(8), 16) | 0]));
 
-  const SHA512_H0 = [
+  const SHA512_H0 = Int32Array.from([
     "6a09e667f3bcc908", "bb67ae8584caa73b", "3c6ef372fe94f82b", "a54ff53a5f1d36f1",
     "510e527fade682d1", "9b05688c2b3e6c1f", "1f83d9abfb41bd6b", "5be0cd19137e2179",
-  ].map((h) => BigInt("0x" + h));
+  ].flatMap((h) => [parseInt(h.slice(0, 8), 16) | 0, parseInt(h.slice(8), 16) | 0]));
 
-  const MASK64 = (1n << 64n) - 1n;
-  const rotr = (x, n) => ((x >> n) | (x << (64n - n))) & MASK64;
+  const TWO32 = 4294967296;
+  const W = new Int32Array(160);
 
-  /** SHA-512 のダイジェスト（64 バイト）を返す */
-  function sha512(bytes) {
-    const bitLength = BigInt(bytes.length) * 8n;
+  /** 128バイト1ブロック分（32ワード）を state（16ワード）に取り込む */
+  function compress(state, block) {
+    W.set(block.subarray(0, 32));
+    for (let t = 32; t < 160; t += 2) {
+      const xh = W[t - 30], xl = W[t - 29]; // W[i-15]
+      const s0h = ((xh >>> 1) | (xl << 31)) ^ ((xh >>> 8) | (xl << 24)) ^ (xh >>> 7);
+      const s0l = ((xl >>> 1) | (xh << 31)) ^ ((xl >>> 8) | (xh << 24)) ^ ((xl >>> 7) | (xh << 25));
+      const yh = W[t - 4], yl = W[t - 3];   // W[i-2]
+      const s1h = ((yh >>> 19) | (yl << 13)) ^ ((yl >>> 29) | (yh << 3)) ^ (yh >>> 6);
+      const s1l = ((yl >>> 19) | (yh << 13)) ^ ((yh >>> 29) | (yl << 3)) ^ ((yl >>> 6) | (yh << 26));
+      const lo = (W[t - 31] >>> 0) + (s0l >>> 0) + (W[t - 13] >>> 0) + (s1l >>> 0);
+      W[t] = W[t - 32] + s0h + W[t - 14] + s1h + ((lo / TWO32) | 0);
+      W[t + 1] = lo;
+    }
+    let ah = state[0], al = state[1], bh = state[2], bl = state[3];
+    let ch = state[4], cl = state[5], dh = state[6], dl = state[7];
+    let eh = state[8], el = state[9], fh = state[10], fl = state[11];
+    let gh = state[12], gl = state[13], hh = state[14], hl = state[15];
+    for (let t = 0; t < 160; t += 2) {
+      const S1h = ((eh >>> 14) | (el << 18)) ^ ((eh >>> 18) | (el << 14)) ^ ((el >>> 9) | (eh << 23));
+      const S1l = ((el >>> 14) | (eh << 18)) ^ ((el >>> 18) | (eh << 14)) ^ ((eh >>> 9) | (el << 23));
+      const chh = (eh & fh) ^ (~eh & gh);
+      const chl = (el & fl) ^ (~el & gl);
+      const t1l = (hl >>> 0) + (S1l >>> 0) + (chl >>> 0) + (SHA512_K[t + 1] >>> 0) + (W[t + 1] >>> 0);
+      const t1h = hh + S1h + chh + SHA512_K[t] + W[t] + ((t1l / TWO32) | 0);
+      const S0h = ((ah >>> 28) | (al << 4)) ^ ((al >>> 2) | (ah << 30)) ^ ((al >>> 7) | (ah << 25));
+      const S0l = ((al >>> 28) | (ah << 4)) ^ ((ah >>> 2) | (al << 30)) ^ ((ah >>> 7) | (al << 25));
+      const mjh = (ah & bh) ^ (ah & ch) ^ (bh & ch);
+      const mjl = (al & bl) ^ (al & cl) ^ (bl & cl);
+      const t2l = (S0l >>> 0) + (mjl >>> 0);
+      const t2h = S0h + mjh + ((t2l / TWO32) | 0);
+      hh = gh; hl = gl; gh = fh; gl = fl; fh = eh; fl = el;
+      let l = (dl >>> 0) + (t1l >>> 0);
+      eh = (dh + t1h + ((l / TWO32) | 0)) | 0; el = l | 0;
+      dh = ch; dl = cl; ch = bh; cl = bl; bh = ah; bl = al;
+      l = (t1l >>> 0) + (t2l >>> 0);
+      ah = (t1h + t2h + ((l / TWO32) | 0)) | 0; al = l | 0;
+    }
+    const v = [ah, al, bh, bl, ch, cl, dh, dl, eh, el, fh, fl, gh, gl, hh, hl];
+    for (let i = 0; i < 16; i += 2) {
+      const l = (state[i + 1] >>> 0) + (v[i + 1] >>> 0);
+      state[i] = (state[i] + v[i] + ((l / TWO32) | 0)) | 0;
+      state[i + 1] = l | 0;
+    }
+  }
+
+  const bytesToWords = (bytes, offset, words) => {
+    for (let i = 0; i < words.length; i++) {
+      const p = offset + i * 4;
+      words[i] = (bytes[p] << 24) | (bytes[p + 1] << 16) | (bytes[p + 2] << 8) | bytes[p + 3];
+    }
+    return words;
+  };
+  const wordsToBytes = (words) => {
+    const out = new Uint8Array(words.length * 4);
+    words.forEach((w, i) => { out[i * 4] = w >>> 24; out[i * 4 + 1] = w >>> 16; out[i * 4 + 2] = w >>> 8; out[i * 4 + 3] = w; });
+    return out;
+  };
+
+  /** state から続けてハッシュする（prefixLength は取り込み済みのバイト数）。結果は16ワード */
+  function finish(state, bytes, prefixLength = 0) {
+    const s = state.slice();
     const paddedLength = Math.ceil((bytes.length + 17) / 128) * 128;
     const data = new Uint8Array(paddedLength);
     data.set(bytes);
     data[bytes.length] = 0x80;
-    for (let i = 0; i < 16; i++) {
-      data[paddedLength - 1 - i] = Number((bitLength >> BigInt(8 * i)) & 0xffn);
-    }
-
-    const h = SHA512_H0.slice();
-    const w = new Array(80);
-    for (let offset = 0; offset < paddedLength; offset += 128) {
-      for (let t = 0; t < 16; t++) {
-        let v = 0n;
-        for (let b = 0; b < 8; b++) v = (v << 8n) | BigInt(data[offset + t * 8 + b]);
-        w[t] = v;
-      }
-      for (let t = 16; t < 80; t++) {
-        const s0 = rotr(w[t - 15], 1n) ^ rotr(w[t - 15], 8n) ^ (w[t - 15] >> 7n);
-        const s1 = rotr(w[t - 2], 19n) ^ rotr(w[t - 2], 61n) ^ (w[t - 2] >> 6n);
-        w[t] = (w[t - 16] + s0 + w[t - 7] + s1) & MASK64;
-      }
-      let [a, b, c, d, e, f, g, hh] = h;
-      for (let t = 0; t < 80; t++) {
-        const S1 = rotr(e, 14n) ^ rotr(e, 18n) ^ rotr(e, 41n);
-        const ch = (e & f) ^ (~e & MASK64 & g);
-        const temp1 = (hh + S1 + ch + SHA512_K[t] + w[t]) & MASK64;
-        const S0 = rotr(a, 28n) ^ rotr(a, 34n) ^ rotr(a, 39n);
-        const maj = (a & b) ^ (a & c) ^ (b & c);
-        const temp2 = (S0 + maj) & MASK64;
-        hh = g; g = f; f = e;
-        e = (d + temp1) & MASK64;
-        d = c; c = b; b = a;
-        a = (temp1 + temp2) & MASK64;
-      }
-      h[0] = (h[0] + a) & MASK64; h[1] = (h[1] + b) & MASK64;
-      h[2] = (h[2] + c) & MASK64; h[3] = (h[3] + d) & MASK64;
-      h[4] = (h[4] + e) & MASK64; h[5] = (h[5] + f) & MASK64;
-      h[6] = (h[6] + g) & MASK64; h[7] = (h[7] + hh) & MASK64;
-    }
-
-    const out = new Uint8Array(64);
-    for (let i = 0; i < 8; i++) {
-      for (let b = 0; b < 8; b++) {
-        out[i * 8 + b] = Number((h[i] >> BigInt(56 - 8 * b)) & 0xffn);
-      }
-    }
-    return out;
+    const bitLength = (prefixLength + bytes.length) * 8; // 2^53 未満なら正確
+    const view = new DataView(data.buffer);
+    view.setUint32(paddedLength - 8, Math.floor(bitLength / TWO32));
+    view.setUint32(paddedLength - 4, bitLength >>> 0);
+    const block = new Int32Array(32);
+    for (let offset = 0; offset < paddedLength; offset += 128) compress(s, bytesToWords(data, offset, block));
+    return s;
   }
 
-  const toHex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  /** SHA-512 のダイジェスト（64 バイト） */
+  const sha512 = (bytes) => wordsToBytes(finish(SHA512_H0, bytes));
+
+  /** PBKDF2-HMAC-SHA512（64 バイト）。自前の計算（Web Crypto が使えないとき用） */
+  function pbkdf2Sha512Js(password, salt, iterations) {
+    const key = new Uint8Array(128);
+    key.set(password.length > 128 ? sha512(password) : password);
+    const inner = SHA512_H0.slice();
+    const outer = SHA512_H0.slice();
+    const pad = new Uint8Array(128);
+    pad.set(key.map((b) => b ^ 0x36)); compress(inner, bytesToWords(pad, 0, new Int32Array(32)));
+    pad.set(key.map((b) => b ^ 0x5c)); compress(outer, bytesToWords(pad, 0, new Int32Array(32)));
+
+    // U1 = HMAC(password, salt || 00 00 00 01)
+    const first = new Uint8Array(salt.length + 4);
+    first.set(salt);
+    first[salt.length + 3] = 1;
+    const u = finish(outer, wordsToBytes(finish(inner, first, 128)), 128);
+    const result = u.slice();
+
+    // 2回目以降は「64バイト + パディング」の1ブロックで済むので、ブロックを使い回す
+    const block = new Int32Array(32);
+    block[16] = 0x80000000 | 0;
+    block[31] = (128 + 64) * 8;
+    const state = new Int32Array(16);
+    for (let i = 1; i < iterations; i++) {
+      block.set(u);
+      state.set(inner); compress(state, block);
+      block.set(state);
+      state.set(outer); compress(state, block);
+      u.set(state);
+      for (let j = 0; j < 16; j++) result[j] ^= u[j];
+    }
+    return wordsToBytes(result);
+  }
+
+  /** PBKDF2-HMAC-SHA512。使えればブラウザ内蔵の Web Crypto（速い）、無ければ自前の計算 */
+  async function pbkdf2Sha512(password, salt, iterations) {
+    try {
+      const subtle = globalThis.crypto && globalThis.crypto.subtle;
+      if (subtle) {
+        const key = await subtle.importKey("raw", password, "PBKDF2", false, ["deriveBits"]);
+        const bits = await subtle.deriveBits({ name: "PBKDF2", hash: "SHA-512", salt, iterations }, key, 512);
+        return new Uint8Array(bits);
+      }
+    } catch (e) { /* 自前の計算で */ }
+    return pbkdf2Sha512Js(password, salt, iterations);
+  }
 
   // ---------------------------------------------------------------
   // Python の random（CPython の Mersenne Twister, MT19937）
@@ -586,6 +658,8 @@ const PasGen2 = (() => {
   // ---------------------------------------------------------------
   const VERSION_TAG = "3wordPasGen2";
   const MIN_PIN_LENGTH = 4;
+  const ITERATIONS = 210000;    // PBKDF2 のくり返し回数（変えるとパスワードが変わる）
+  const TEST_ITERATIONS = 1000; // 互換性チェック用
   const UPPERCASE = Array.from("ABCDEFGHIJKLMNOPQRSTUVWXYZ").filter((c) => c !== "O");
   const LOWERCASE = Array.from("abcdefghijklmnopqrstuvwxyz").filter((c) => c !== "l");
   const DIGITS = Array.from("0123456789").filter((c) => !"10".includes(c));
@@ -598,12 +672,18 @@ const PasGen2 = (() => {
     return "";
   }
 
-  /** 引数はすべて正規化済みのもの */
-  function generatePassword(pin, keywords, site, useSymbols = true, length = 16) {
+  /** 正規化済みの入力からシード（PBKDF2 の16進）を作る。ここが重い計算 */
+  async function deriveSeed(pin, keywords, site, iterations = ITERATIONS) {
     const error = validate(pin, site);
     if (error) throw new RangeError(error);
-    const message = [VERSION_TAG, pin, ...keywords, site].join("\0");
-    const rng = new PythonRandom(toHex(sha512(utf8(message))));
+    const secret = utf8([pin, ...keywords, site].join("\0"));
+    const salt = utf8(VERSION_TAG + "\0" + site);
+    return toHex(await pbkdf2Sha512(secret, salt, iterations));
+  }
+
+  /** シードから文字を選ぶ（現行方式と同じ手順。こちらは軽い） */
+  function passwordFromSeed(seed, useSymbols = true, length = 16) {
+    const rng = new PythonRandom(seed);
 
     // 大文字・小文字・数字を必ず2文字ずつ入れる
     let passwordChars = [];
@@ -637,31 +717,38 @@ const PasGen2 = (() => {
     ["accounts.google.com", "accounts.google.com"],
     ["ゆうちょ", "ゆうちょ"],
   ];
-  const COMPATIBILITY_VECTORS = [
-    ["1234", ["apple", "banana", "cherry"], "amazon.co.jp", 16, "dmr3?SP)k2Y!YNJ9", "3KY9xUmjYPfHLrJk"],
-    ["０９８７", ["ａｐｐｌｅ", "  banana ", "ｶﾀｶﾅ"], "https://www.Amazon.co.jp/gp/cart", 12, "z39QIm&/=%ip", "j39QImUn2yiI"],
-    ["秘密の芯!", ["パスワード", "東京", "🍎"], "Google", 20, "(vEUyY$8EjTn9UB9Wg3&", "kY2HMkcnrfMdjzEJ9WU3"],
-    ["abcd", ["", "", ""], "x", 16, "Q8VQ)2VwHfRD*ixR", "QnxCG2NgcMfRRnR8"],
-    ["1234", ["ab", "c", ""], "example.com", 16, "Pm?2gkW*dq2mbV8Z", "aer2fYWRZrq8mvWL"],
-    ["1234", ["a", "bc", ""], "example.com", 16, "FI54X?5*Qz4t&=T(", "iI53f2n2nz4tw4Tc"],
+  const COMPATIBILITY_VECTORS = [  // TEST_ITERATIONS 回
+    ["1234", ["apple", "banana", "cherry"], "amazon.co.jp", 16, "+2jDozKTM38RV=zD", "42RDovzTK3IdCqkN"],
+    ["０９８７", ["ａｐｐｌｅ", "  banana ", "ｶﾀｶﾅ"], "https://www.Amazon.co.jp/gp/cart", 12, "(og4TDC+/b2(", "Co94TDanwb25"],
+    ["秘密の芯!", ["パスワード", "東京", "🍎"], "Google", 20, "bXm7yuov$EMv=2amw/5E", "WTevymgn4DMm62Vew95E"],
+    ["abcd", ["", "", ""], "x", 16, "y%6Eh+&QWm6w9#/j", "j4HoSuhEQej9639p"],
+    ["1234", ["ab", "c", ""], "example.com", 16, "#xoae(LNF5p#3ZKI", "bVJxoWhI9INE53Zy"],
+    ["1234", ["a", "bc", ""], "example.com", 16, "N/ML/Tk86ukkEYo=", "9EeUKLmKo86PMdik"],
+  ];
+  const FULL_VECTORS = [  // 本番の ITERATIONS 回
+    ["1234", ["apple", "banana", "cherry"], "amazon.co.jp", 16, "=Re2z7y&gYgn6)MS", "exNR672LzFFYghuF"],
   ];
 
-  function passesCompatibilityCheck() {
+  async function checkVectors(vectors, iterations) {
+    for (const [pin, kws, site, length, symbols, noSymbols] of vectors) {
+      const seed = await deriveSeed(normalizeText(pin), kws.map(normalizeText), normalizeSite(site), iterations);
+      if (passwordFromSeed(seed, true, length) !== symbols || passwordFromSeed(seed, false, length) !== noSymbols) return false;
+    }
+    return true;
+  }
+
+  async function passesCompatibilityCheck() {
     try {
       return SITE_VECTORS.every(([input, expected]) => normalizeSite(input) === expected)
-        && COMPATIBILITY_VECTORS.every(([pin, kws, site, length, symbols, noSymbols]) => {
-          const p = normalizeText(pin);
-          const k = kws.map(normalizeText);
-          const s = normalizeSite(site);
-          return generatePassword(p, k, s, true, length) === symbols
-            && generatePassword(p, k, s, false, length) === noSymbols;
-        });
+        && pbkdf2Sha512Js(utf8("pin"), utf8("salt"), 3).join() === (await pbkdf2Sha512(utf8("pin"), utf8("salt"), 3)).join()
+        && await checkVectors(COMPATIBILITY_VECTORS, TEST_ITERATIONS)
+        && await checkVectors(FULL_VECTORS, ITERATIONS);
     } catch (e) {
       return false;
     }
   }
 
-  return { generatePassword, normalizeText, normalizeSite, validate, passesCompatibilityCheck };
+  return { deriveSeed, passwordFromSeed, normalizeText, normalizeSite, validate, passesCompatibilityCheck };
 })();
 
 // -----------------------------------------------------------------
@@ -682,6 +769,8 @@ if (typeof document !== "undefined") {
   const lengthButtons = Array.from(document.querySelectorAll(".segmented button"));
   let length = DEFAULT_LENGTH;
   let usedSite = "";
+  let currentSeed = "";   // 生成済みのシード（文字数を変えたときは計算し直さずに使う）
+  let busy = false;
 
   const setStatus = (text, isError = false) => {
     $("status").textContent = text;
@@ -755,10 +844,19 @@ if (typeof document !== "undefined") {
       setVisible(id, false);
     }
     usedSite = "";
+    currentSeed = "";
+  }
+
+  function showPasswords() {
+    for (const [id, row] of Object.entries(rows)) {
+      row.password = PasGen2.passwordFromSeed(currentSeed, row.useSymbols, length);
+      render(id);
+    }
+    setStatus(`「${usedSite}」用・${length}文字で生成しました`);
   }
 
   // 生成処理（文字数は選択中のもの）。成功したら true
-  function generatePasswords() {
+  async function generatePasswords() {
     const pin = PasGen2.normalizeText(pinInput.value);
     const keywords = keywordInputs.map((input) => PasGen2.normalizeText(input.value));
     const site = PasGen2.normalizeSite(siteInput.value);
@@ -766,23 +864,40 @@ if (typeof document !== "undefined") {
     if (error) {
       clearPasswords();
       setStatus(error, true);
-      (Array.from(pin).length < 4 ? pinInput : siteInput).focus();
+      (PasGen2.validate(pin, "x") ? pinInput : siteInput).focus();
       return false;
     }
-    for (const [id, row] of Object.entries(rows)) {
-      row.password = PasGen2.generatePassword(pin, keywords, site, row.useSymbols, length);
-      render(id);
+    clearPasswords();
+    busy = true;
+    $("generate").disabled = true;
+    $("generate").textContent = "計算中…";
+    setStatus("計算中…（わざと重くしてあります）");
+    const inputsAtStart = allInputs.map((input) => input.value).join("\0");
+    try {
+      // 「計算中…」を画面に出してから重い計算をする
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      const seed = await PasGen2.deriveSeed(pin, keywords, site);
+      // 計算中に入力が変わっていたら、その結果は使わない
+      if (allInputs.map((input) => input.value).join("\0") !== inputsAtStart) return false;
+      currentSeed = seed;
+      usedSite = site;
+      showPasswords();
+      return true;
+    } catch (e) {
+      setStatus("生成できませんでした", true);
+      return false;
+    } finally {
+      busy = false;
+      $("generate").disabled = false;
+      $("generate").textContent = "生成";
     }
-    usedSite = site;
-    setStatus(`「${site}」用・${length}文字で生成しました`);
-    return true;
   }
 
   // 文字数の切り替え（生成済みなら同じ入力で作り直す）
   function setLength(newLength) {
     length = newLength;
     lengthButtons.forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.length) === length)));
-    if (rows.pw_symbols.password) generatePasswords();
+    if (currentSeed) showPasswords();
   }
 
   // クリップボードへコピー（使えない環境では従来の方法で）
@@ -841,10 +956,7 @@ if (typeof document !== "undefined") {
   }
 
   $("generate").addEventListener("click", () => {
-    if (generatePasswords()) {
-      setVisible("pw_symbols", false);
-      setVisible("pw_nosymbols", false);
-    }
+    if (!busy) generatePasswords();
   });
   $("reset").addEventListener("click", resetFields);
   $("copy_keywords").addEventListener("click", copyKeywords);
@@ -858,7 +970,7 @@ if (typeof document !== "undefined") {
 
   // 入力を変えたら、古い入力で作ったパスワードは消す（別サイト用を取り違えないように）
   allInputs.forEach((input) => input.addEventListener("input", () => {
-    if (rows.pw_symbols.password) {
+    if (currentSeed) {
       clearPasswords();
       setStatus("入力が変わったので、もう一度「生成」してください");
     }
@@ -874,11 +986,19 @@ if (typeof document !== "undefined") {
     });
   });
 
-  // 起動時に Python 版と同じ結果になるか確認
-  if (!PasGen2.passesCompatibilityCheck()) {
-    $("warning").hidden = false;
-    $("generate").disabled = true;
-  }
+  // 起動時に Python 版と同じ結果になるか確認（終わるまで「生成」は押せない）
+  busy = true;
+  $("generate").disabled = true;
+  $("generate").textContent = "確認中…";
+  PasGen2.passesCompatibilityCheck().then((ok) => {
+    $("generate").textContent = "生成";
+    if (ok) {
+      busy = false;
+      $("generate").disabled = false;
+    } else {
+      $("warning").hidden = false;
+    }
+  });
 
   // オフラインで使えるように、ページを端末に保存する（https で開いたときのみ）
   if ("serviceWorker" in navigator && window.isSecureContext && location.protocol !== "file:") {
