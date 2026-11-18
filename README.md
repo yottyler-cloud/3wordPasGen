@@ -12,15 +12,29 @@
 - **全角→半角を自動変換**: 全角で入力しても半角と同じ結果になります（NFKC正規化）。
 - ワンタップでクリップボードにコピー、リセットボタンで入力と結果を消去。
 
-## 動作環境
-- iPad / iPhone の [Pythonista 3](http://omz-software.com/pythonista/)
-  - `ui` と `clipboard` は Pythonista 専用モジュールのため、PC の Python では動きません。
+## 構成
+| パス | 内容 |
+|---|---|
+| `3wordPasGen.py` | Python 版（Pythonista 3 用） |
+| `ios/3wordPasGen.swiftpm/` | Swift 版（SwiftUI。Swift Playgrounds / Xcode 用） |
 
-## 使い方
-1. `3wordPasGen.py` を Pythonista にコピーします。
-2. 実行するとシートが開きます。
+Swift 版は Python 版と**同じキーワードから同じパスワード**を生成します。
+Python の `random`（Mersenne Twister）の `seed` / `choices` / `sample` / `shuffle` を
+`PythonRandom.swift` で同じ動作になるよう移植しています。
+起動時に Python 版で生成した値と照合し、一致しない場合は画面に警告を表示します。
+
+## 使い方（Swift 版 / iPad）
+1. `ios/3wordPasGen.swiftpm` フォルダを iPad の「ファイル」に置きます。
+2. Swift Playgrounds で開いて実行します（Mac の場合は Xcode でも開けます）。
 3. キーワードを3つ入力して「生成」をタップします。
 4. 「記号ありコピー」または「記号なしコピー」でクリップボードにコピーします。
+
+キーボードの自動大文字化・自動修正はオフにしてあります（入力が勝手に変わると別のパスワードになるため）。
+
+## 使い方（Python 版 / Pythonista）
+1. `3wordPasGen.py` を Pythonista にコピーします。
+2. 実行するとシートが開きます。
+3. 以降は Swift 版と同じです。
 
 ## 注意
 - 生成ロジック（文字セット、記号、文字数、ハッシュ方式、キーワードの結合方法）を変えると、
