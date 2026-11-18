@@ -203,8 +203,7 @@ def run_app():
     def set_eye(button, visible):
         image = eye_image(visible)
         if image is not None:
-            button.image = image
-            button.title = ''
+            button.image = image   # 文字は設定しない（空の文字でも「…」と出てしまうため）
         else:
             button.title = '隠す' if visible else '表示'
 
@@ -420,7 +419,8 @@ def run_app():
         b = ui.Button()
         if name:
             b.name = name
-        b.title = title
+        if title:
+            b.title = title
         b.font = ('<system>', 17)
         b.bg_color = ACCENT if primary else BUTTON
         b.tint_color = '#ffffff' if primary else ACCENT
@@ -447,7 +447,7 @@ def run_app():
     mask = label(PIN_MASK, (16, 0, card_w - 80, 52), size=17, parent=c, name='pin_mask')
     mask.touch_enabled = False
     mask.hidden = True
-    button(c, '', (card_w - 50, 6, 40, 40), toggle_pin, name='eye_pin')
+    button(c, '', (card_w - 58, 4, 48, 44), toggle_pin, name='eye_pin')
 
     # キーワード
     section('キーワード')
@@ -489,7 +489,7 @@ def run_app():
         if i:
             separator(c, top - 1)
         label(title, (16, top + 8, 120, 40), parent=c)
-        button(c, '', (card_w - 16 - 90 - 10 - 40, top + 8, 40, 40),
+        button(c, '', (card_w - 16 - 90 - 10 - 48, top + 6, 48, 44),
                lambda sender, n=name: set_visible(n, not state['visible'][n]), name='eye_' + name)
         button(c, 'コピー', (card_w - 16 - 90, top + 8, 90, 40), copy_password, name='copy_' + name)
         tv = ui.TextView(name=name, frame=(12, top + 50, card_w - 24, 40), editable=False, scroll_enabled=False)
