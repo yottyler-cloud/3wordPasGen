@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- 通信禁止：このページは外部への通信・外部ファイルの読み込みを一切行わない -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JS23u/DwKIYXHdLOwg7xteAoGhyDO3REf1mz/0Htqnk='; style-src 'sha256-hCQW5zBY5gfAgJMz9BTFbR5018bu6LJPrkh+EvwOFFI='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-l/AcnU+u10EgSPG7qbTykvgDvZz1CO2Tabvyp+fesIs='; style-src 'sha256-6PKBn2MSm+r9EOIdsw8b4T4NSnljVLghKXEwLtTz1hg='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="format-detection" content="telephone=no">
@@ -27,6 +27,7 @@
   --accent-text: #ffffff;
   --button: #e5e5ea;
   --danger: #d70015;
+  --digit: #e0001b;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -39,6 +40,7 @@
     --accent-text: #ffffff;
     --button: #2c2c2e;
     --danger: #ff453a;
+    --digit: #ff5c52;
   }
 }
 * { box-sizing: border-box; }
@@ -124,6 +126,8 @@ button.primary { background: var(--accent); color: var(--accent-text); }
   padding: 14px 16px;
   font-weight: 600;
 }
+/* パスワード中の数字は赤で表示 */
+.pw .digit { color: var(--digit); font-weight: 600; }
 [hidden] { display: none !important; }
 </style>
 </head>
@@ -488,13 +492,28 @@ if (typeof document !== "undefined") {
 
   const setStatus = (text) => { $("status").textContent = text; };
 
+  // パスワードを表示（数字だけ赤くする。コピーされる文字列は変わらない）
+  function showPassword(element, password) {
+    element.textContent = "";
+    for (const ch of password) {
+      if (ch >= "0" && ch <= "9") {
+        const span = document.createElement("span");
+        span.className = "digit";
+        span.textContent = ch;
+        element.appendChild(span);
+      } else {
+        element.appendChild(document.createTextNode(ch));
+      }
+    }
+  }
+
   // 生成ボタン処理
   function generatePasswords() {
     const keywords = inputs.map((input) => ThreeWordPasGen.normalizeKeyword(input.value));
     passwords.pw_symbols = ThreeWordPasGen.generatePassword(keywords, true);
     passwords.pw_nosymbols = ThreeWordPasGen.generatePassword(keywords, false);
-    $("pw_symbols").textContent = passwords.pw_symbols;
-    $("pw_nosymbols").textContent = passwords.pw_nosymbols;
+    showPassword($("pw_symbols"), passwords.pw_symbols);
+    showPassword($("pw_nosymbols"), passwords.pw_nosymbols);
     setStatus("");
   }
 
