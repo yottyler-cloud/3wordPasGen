@@ -351,16 +351,30 @@ def run_app():
     delegate = FieldDelegate()
 
     # --- 画面の組み立て ---
-    width = min(540, ui.get_screen_size()[0])
+    # フルスクリーンで表示し、中身は最大720の幅で中央に置く（ブラウザ版と同じ）
+    screen_w, screen_h = ui.get_screen_size()
+    width = min(720, screen_w)
     pad = 16
     card_w = width - pad * 2
-    root = ui.View(name='パスワード生成（新方式）', bg_color=BG, frame=(0, 0, width, 760))
+
+    class Root(ui.View):
+        def layout(self):
+            # 回転などで大きさが変わったら、中身を中央に置き直す
+            content.x = max(0, (self.width - width) / 2)
+            scroll.content_size = (self.width, content.height)
+
+    root = Root()
+    root.name = 'パスワード生成（新方式）'
+    root.bg_color = BG
+    root.frame = (0, 0, screen_w, screen_h)
     scroll = ui.ScrollView(frame=root.bounds, flex='WH', bg_color=BG)
     root.add_subview(scroll)
+    content = ui.View(frame=(0, 0, width, 760), bg_color=BG)
+    scroll.add_subview(content)
     y = [16]
 
     def add(sub):
-        scroll.add_subview(sub)
+        content.add_subview(sub)
         return sub
 
     def label(text, frame, size=17, color=TEXT, bold=False, align=ui.ALIGN_LEFT, parent=None, name=None):
@@ -369,7 +383,7 @@ def run_app():
             lb.name = name
         lb.font = ('<system-bold>' if bold else '<system>', size)
         lb.number_of_lines = 0
-        (parent or scroll).add_subview(lb)
+        (parent or content).add_subview(lb)
         return lb
 
     def card(height):
@@ -482,7 +496,7 @@ def run_app():
     label('今まで作ったパスワードは 3wordPasGen.py（現行方式）で作れます。',
           (pad + 4, y[0], card_w - 8, 40), size=14, color=MUTED)
     y[0] += 56
-    scroll.content_size = (width, y[0])
+    content.height = y[0]
 
     # 部品を名前で取り出せるよう、カードの中もまとめて登録
     named = {}
@@ -504,7 +518,8 @@ def run_app():
     update_site_preview()
     for name in state['pw']:
         set_visible(name, False)
-    root.present('sheet')
+    root.layout()
+    root.present('fullscreen')
 
 
 if __name__ == '__main__':
