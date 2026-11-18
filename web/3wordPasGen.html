@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- 通信禁止：このページは外部への通信・外部ファイルの読み込みを一切行わない -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jkMZQ3trPCsKLJr9/fagsPPBbmqSE2kxG92O7ZSLqYk='; style-src 'sha256-yvj9e5lL/m6BhPAQJnvU2JnygXS3nVQvu6nVCjsbJS0='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-IkB7/fIu2esV5we0/bBwPeQHrvukl8LlHuSwbmSG5kI='; style-src 'sha256-AwBoqcfTRfQ86bc6Z7KWE/QPVXKFBPh1/8eBu1WGMvc='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="format-detection" content="telephone=no">
@@ -27,7 +27,8 @@
   --accent-text: #ffffff;
   --button: #e5e5ea;
   --danger: #d70015;
-  --digit: #e0001b;
+  --digit: #0040dd;
+  --lower: #e0001b;
   --seg-selected: #ffffff;
   --seg-selected-text: #0a84ff;
 }
@@ -42,7 +43,8 @@
     --accent-text: #ffffff;
     --button: #2c2c2e;
     --danger: #ff453a;
-    --digit: #ff5c52;
+    --digit: #409cff;
+    --lower: #ff5c52;
     --seg-selected: #636366;
     --seg-selected-text: #ffffff;
   }
@@ -177,8 +179,9 @@ button.eye svg { width: 22px; height: 22px; }
   padding: 14px 16px;
   font-weight: 600;
 }
-/* パスワード中の数字は赤で表示 */
-.pw .digit { color: var(--digit); font-weight: 600; }
+/* パスワードの色分け（Python 版と同じ）：数字は青、小文字は赤、それ以外は通常色 */
+.pw .digit { color: var(--digit); }
+.pw .lower { color: var(--lower); }
 [hidden] { display: none !important; }
 </style>
 </head>
@@ -485,24 +488,35 @@ const ThreeWordPasGen = (() => {
   // ---------------------------------------------------------------
   // パスワード生成（3wordPasGen.py の generate_password と同じ）
   // ---------------------------------------------------------------
-  const BASE_CHARS = Array.from("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-    .filter((c) => !"l1O0".includes(c));
-  const SYMBOL_CHARS = Array.from("!#@$%&*()=+?/");
+  const UPPERCASE = Array.from("ABCDEFGHIJKLMNOPQRSTUVWXYZ").filter((c) => c !== "O");
+  const LOWERCASE = Array.from("abcdefghijklmnopqrstuvwxyz").filter((c) => c !== "l");
+  const DIGITS = Array.from("0123456789").filter((c) => !"10".includes(c));
+  const SYMBOLS = Array.from("!#@$%&*()=+?/");
 
   function generatePassword(keywords, useSymbols = true, length = 12) {
     const combined = keywords.join("");                 // キーワードを区切りなしで結合
     const hashDigest = toHex(sha512(utf8(combined)));   // SHA-512 の16進文字列
     const rng = new PythonRandom(hashDigest);           // 同じキーワードで同じパスワードになる
 
+    // 大文字・小文字・数字を必ず2文字ずつ入れる
+    let passwordChars = [];
+    passwordChars = passwordChars.concat(rng.sample(UPPERCASE, 2));
+    passwordChars = passwordChars.concat(rng.sample(LOWERCASE, 2));
+    passwordChars = passwordChars.concat(rng.sample(DIGITS, 2));
+    let usedLength = 6;
+
     if (useSymbols) {
-      if (length < 2) throw new RangeError("Password length must be at least 2 to include symbols.");
-      const selectedSymbols = rng.sample(SYMBOL_CHARS, 2);
-      const remainingChars = rng.choices(BASE_CHARS, length - 2);
-      const passwordList = selectedSymbols.concat(remainingChars);
-      rng.shuffle(passwordList);
-      return passwordList.join("");
+      if (length < 8) throw new RangeError("記号ありの場合は最低8文字必要です。");
+      passwordChars = passwordChars.concat(rng.sample(SYMBOLS, 2));
+      usedLength += 2;
     }
-    return rng.choices(BASE_CHARS, length).join("");
+
+    // 残りは全種類から選ぶ
+    const remainingLength = length - usedLength;
+    const pool = UPPERCASE.concat(LOWERCASE, DIGITS, useSymbols ? SYMBOLS : []);
+    passwordChars = passwordChars.concat(rng.choices(pool, Math.max(0, remainingLength)));
+    rng.shuffle(passwordChars);
+    return passwordChars.join("");
   }
 
   // ---------------------------------------------------------------
@@ -528,11 +542,11 @@ const ThreeWordPasGen = (() => {
   // Python 版との互換性チェック（Python 版で実際に生成した値）
   // ---------------------------------------------------------------
   const COMPATIBILITY_VECTORS = [
-    [["apple", "banana", "cherry"], "jWeK2)zEFJ!c", "FWcjEFK2eJzo"],
-    [["", "", ""], "KBVh)FwY#AMQ", "HAMKQFYwhBVw"],
-    [["パスワード", "東京", "🍎"], "y$7+GpMDGC3E", "L7G3CyEpMGDD"],
-    [["Hello World", "123", "!?"], "y&iviqNkNa=Q", "tiyiNQqkNvaz"],
-    [["ａｐｐｌｅ", "  banana ", "ｶﾀｶﾅ"], "#2YdXixNR?iP", "QYi2RidXPNxJ"],
+    [["apple", "banana", "cherry"], "4iB!n5$bF)Rt", "54fREi2kBbje"],
+    [["", "", ""], "Wo75SdD6*r?s", "YSj7DtSoN6Ys"],
+    [["パスワード", "東京", "🍎"], "2V!PsGvs9(*3", "envVPsG23gcY"],
+    [["Hello World", "123", "!?"], "8Mez*wUKv2@U", "oUoe8qQIKKv2"],
+    [["ａｐｐｌｅ", "  banana ", "ｶﾀｶﾅ"], "7!D@D3rXDG/e", "rFDxDN37XtDe"],
   ];
 
   function passesCompatibilityCheck() {
@@ -566,7 +580,7 @@ if (typeof document !== "undefined") {
 
   const setStatus = (text) => { $("status").textContent = text; };
 
-  // パスワードを表示（伏せ字のときは●、表示中は数字だけ赤くする。コピーされる文字列は変わらない）
+  // パスワードを表示（伏せ字のときは●、表示中は数字を青・小文字を赤にする。コピーされる文字列は変わらない）
   function render(id) {
     const row = rows[id];
     const element = $(id);
@@ -577,9 +591,10 @@ if (typeof document !== "undefined") {
       return;
     }
     for (const ch of row.password) {
-      if (ch >= "0" && ch <= "9") {
+      const kind = /[0-9]/.test(ch) ? "digit" : /[a-z]/.test(ch) ? "lower" : "";
+      if (kind) {
         const span = document.createElement("span");
-        span.className = "digit";
+        span.className = kind;
         span.textContent = ch;
         element.appendChild(span);
       } else {
