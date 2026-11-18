@@ -357,11 +357,15 @@ def run_app():
     pad = 16
     card_w = width - pad * 2
 
+    button_frames = []   # ボタンの大きさ（Pythonista が勝手に縮めることがあるので、あとで指定し直す）
+
     class Root(ui.View):
         def layout(self):
             # 回転などで大きさが変わったら、中身を中央に置き直す
             content.x = max(0, (self.width - width) / 2)
             scroll.content_size = (self.width, content.height)
+            for b, frame in button_frames:
+                b.frame = frame
 
     root = Root()
     root.name = 'パスワード生成（新方式）'
@@ -413,26 +417,28 @@ def run_app():
         return tf
 
     def button(parent, title, frame, action, primary=False, name=None):
-        b = ui.Button(frame=frame, title=title)
+        b = ui.Button()
         if name:
             b.name = name
+        b.title = title
+        b.font = ('<system>', 17)
         b.bg_color = ACCENT if primary else BUTTON
         b.tint_color = '#ffffff' if primary else ACCENT
         b.corner_radius = frame[3] / 2
-        b.font = ('<system>', 17)
         b.action = action
         parent.add_subview(b)
+        b.frame = frame   # 大きさは最後に指定する
+        button_frames.append((b, frame))
         return b
 
-    # 見出し
-    label('パスワード生成', (pad + 4, y[0], 230, 40), size=30, bold=True)
-    badge = label('新方式', (pad + 236, y[0] + 8, 64, 26), size=14, color='#ffffff', bold=True, align=ui.ALIGN_CENTER)
+    # 見出し（「パスワード生成（新方式）」は上のタイトルバーに出るので、ここは印と説明だけ）
+    y[0] = 20
+    badge = label('新方式', (pad + 4, y[0], 64, 26), size=14, color='#ffffff', bold=True, align=ui.ALIGN_CENTER)
     badge.bg_color = ACCENT
     badge.corner_radius = 6
-    y[0] += 46
     label('暗証番号 ＋ キーワード3つ ＋ サイト名。現行方式とは別のパスワードになります。',
-          (pad + 4, y[0], card_w - 8, 40), size=14, color=MUTED)
-    y[0] += 50
+          (pad + 80, y[0] - 7, card_w - 84, 40), size=14, color=MUTED)
+    y[0] += 44
 
     # 暗証番号
     section('暗証番号（全サイト共通・4文字以上・数字以外も可）')
@@ -458,7 +464,7 @@ def run_app():
     separator(c, 52)
     label('', (16, 53, card_w - 32, 40), size=14, color=MUTED, parent=c, name='site_preview')
     separator(c, 93)
-    button(c, 'キーワード・サイト名をコピー', (card_w - 16 - 260, 94 + 8, 260, 40), copy_keywords)
+    button(c, 'キーワード・サイト名をコピー', (card_w - 16 - 300, 94 + 8, 300, 40), copy_keywords)
 
     # 文字数
     c = card(56)
