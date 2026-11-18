@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- 通信禁止：このページは外部への通信・外部ファイルの読み込みを一切行わない -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-xvtxXeKyTCFkf9pSPAYMjMeUTwihd00QB613Oj5Rgo0='; style-src 'sha256-yvj9e5lL/m6BhPAQJnvU2JnygXS3nVQvu6nVCjsbJS0='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-jkMZQ3trPCsKLJr9/fagsPPBbmqSE2kxG92O7ZSLqYk='; style-src 'sha256-yvj9e5lL/m6BhPAQJnvU2JnygXS3nVQvu6nVCjsbJS0='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="format-detection" content="telephone=no">
@@ -203,8 +203,8 @@ button.eye svg { width: 22px; height: 22px; }
     <div class="option">
       <span>文字数</span>
       <div class="segmented" role="group" aria-label="文字数">
-        <button type="button" data-length="8" aria-pressed="false">8</button>
-        <button type="button" data-length="12" aria-pressed="true">12</button>
+        <button type="button" data-length="8" aria-pressed="true">8</button>
+        <button type="button" data-length="12" aria-pressed="false">12</button>
         <button type="button" data-length="16" aria-pressed="false">16</button>
         <button type="button" data-length="20" aria-pressed="false">20</button>
       </div>
@@ -556,7 +556,7 @@ const ThreeWordPasGen = (() => {
 if (typeof document !== "undefined") {
   const $ = (id) => document.getElementById(id);
   const inputs = [$("kw1"), $("kw2"), $("kw3")];
-  const DEFAULT_LENGTH = 12;
+  const DEFAULT_LENGTH = 8;
   const rows = {
     pw_symbols: { useSymbols: true, name: "記号あり", password: "", visible: false, eye: $("eye_symbols") },
     pw_nosymbols: { useSymbols: false, name: "記号なし", password: "", visible: false, eye: $("eye_nosymbols") },
@@ -660,7 +660,7 @@ if (typeof document !== "undefined") {
     setStatus(ok ? "キーワード3つをコピーしました" : "コピーできませんでした");
   }
 
-  // リセット処理（文字数も 12 に戻し、伏せ字に戻す）
+  // リセット処理（文字数も初期値に戻し、伏せ字に戻す）
   function resetFields() {
     inputs.forEach((input) => { input.value = ""; });
     for (const [id, row] of Object.entries(rows)) {
