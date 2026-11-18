@@ -195,25 +195,47 @@ def run_app():
 
     eye_icons = {}   # 目のマークのボタン名 → アイコンを表示する ImageView
 
+    eye_cache = {}
+
     def eye_image(visible):
-        """目のマーク（表示中は斜線入り）。アイコンが無ければ None"""
+        """目のマークを自分で描く（表示中は斜線入り）。描けなければ None
+        （Pythonista 内蔵のアイコンには斜線入りの目が無いため）"""
+        if visible in eye_cache:
+            return eye_cache[visible]
+        image = None
         try:
-            image = ui.Image.named('iob:eye_disabled_24' if visible else 'iob:eye_24')
+            with ui.ImageContext(24, 24) as ctx:
+                ui.set_color(ACCENT)
+                outline = ui.Path()
+                outline.move_to(1.5, 12)
+                outline.add_quad_curve(22.5, 12, 12, 1)
+                outline.add_quad_curve(1.5, 12, 12, 23)
+                outline.close()
+                outline.line_width = 2
+                outline.line_join_style = ui.LINE_JOIN_ROUND
+                outline.stroke()
+                pupil = ui.Path.oval(8.5, 8.5, 7, 7)
+                pupil.line_width = 2
+                pupil.stroke()
+                if visible:
+                    slash = ui.Path()
+                    slash.move_to(3, 3)
+                    slash.line_to(21, 21)
+                    slash.line_width = 2
+                    slash.line_cap_style = ui.LINE_CAP_ROUND
+                    slash.stroke()
+                image = ctx.get_image()
         except Exception:
-            return None
-        try:
-            image = image.with_rendering_mode(ui.RENDERING_MODE_TEMPLATE)  # 緑で表示するため
-        except Exception:
-            pass
+            image = None
+        eye_cache[visible] = image
         return image
 
     def set_eye(button, visible):
         # ボタン自体には文字も画像も入れず、上に重ねた ImageView でアイコンを出す
         # （ボタンに画像を入れると、Pythonista では横に「…」が出てしまうため）
         image = eye_image(visible)
-        if image is not None:
-            eye_icons[button.name].image = image
-        else:
+        eye_icons[button.name].image = image
+        if image is None:   # 描けなかったときだけ文字で出す
             button.title = '隠す' if visible else '表示'
 
     # --- パスワードの表示（伏せ字は●、表示中は数字を青・小文字を赤） ---
@@ -411,7 +433,6 @@ def run_app():
         b = button(parent, '', frame, action, name=name)
         icon = ui.ImageView(frame=((frame[2] - 24) / 2, (frame[3] - 24) / 2, 24, 24))
         icon.touch_enabled = False
-        icon.tint_color = ACCENT
         b.add_subview(icon)
         eye_icons[name] = icon
         return b
