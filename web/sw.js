@@ -7,11 +7,13 @@
  * - アプリを更新したときは CACHE_VERSION の数字を上げる。
  *   ブラウザは sw.js の変更を検知したときだけ、新しいファイルを保存し直す。
  */
-const CACHE_VERSION = "3wordpasgen-v8";
+const CACHE_VERSION = "3wordpasgen-v9";
 
 const FILES = [
   "./3wordPasGen.html",
   "./manifest.webmanifest",
+  "./3wordPasGen2.html",
+  "./manifest2.webmanifest",
   "./icons/apple-touch-icon.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- 通信禁止：このページは外部への通信・外部ファイルの読み込みを一切行わない -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-aS/Mt9LUL9N9LN/0lliZoGTx8BEjxllqNFO6UlGrF8w='; style-src 'sha256-kNQUQ6eMe5ukOPXAJogCK8J4/QFgy3IW8x+c4cJW6fI='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="format-detection" content="telephone=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PasGen2">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f2f2f7">
+<link rel="manifest" href="manifest2.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<title>3wordPasGen2</title>
+<style>
+:root {
+  --bg: #f2f2f7;
+  --card: #ffffff;
+  --text: #1c1c1e;
+  --muted: #8e8e93;
+  --line: #d1d1d6;
+  --accent: #0a84ff;
+  --accent-text: #ffffff;
+  --button: #e5e5ea;
+  --danger: #d70015;
+  --digit: #0040dd;
+  --lower: #e0001b;
+  --seg-selected: #ffffff;
+  --seg-selected-text: #0a84ff;
+  --badge: #34c759;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --card: #1c1c1e;
+    --text: #f2f2f7;
+    --muted: #8e8e93;
+    --line: #38383a;
+    --accent: #0a84ff;
+    --accent-text: #ffffff;
+    --button: #2c2c2e;
+    --danger: #ff453a;
+    --digit: #409cff;
+    --lower: #ff5c52;
+    --seg-selected: #636366;
+    --seg-selected-text: #ffffff;
+    --badge: #30d158;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", sans-serif;
+  font-size: 17px;
+  line-height: 1.4;
+}
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+h1 {
+  font-size: 32px;
+  margin: 8px 4px 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  background: var(--badge);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+.sub {
+  color: var(--muted);
+  margin: 0 4px 20px;
+  font-size: 15px;
+}
+.section-title {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 16px 6px;
+}
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.card > * + * { border-top: 1px solid var(--line); }
+input {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  padding: 14px 16px;
+  outline: none;
+}
+input::placeholder { color: var(--muted); }
+/* 暗証番号は伏せ字（type=password にするとパスワード管理機能が保存を勧めてくるため、表示だけ伏せる） */
+input.secret { -webkit-text-security: disc; text-security: disc; }
+.field {
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+}
+.field input { flex: 1; min-width: 0; }
+.note {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 8px 16px;
+}
+.note.error { color: var(--danger); font-weight: 600; }
+.note .site { color: var(--text); font-family: ui-monospace, Menlo, Consolas, monospace; }
+.actions {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+}
+button {
+  font: inherit;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 18px;
+  background: var(--button);
+  color: var(--accent);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button:active { opacity: .6; }
+button:disabled { opacity: .4; cursor: default; }
+.actions button { flex: 1; padding: 10px 18px; }
+button.primary { background: var(--accent); color: var(--accent-text); }
+.row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  grid-template-areas: "label pw eye copy";
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 16px;
+}
+.row .label { grid-area: label; white-space: nowrap; }
+.row .pw {
+  grid-area: pw;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 19px;
+  white-space: nowrap;
+  -webkit-user-select: all;
+  user-select: all;
+}
+.row .eye { grid-area: eye; }
+.row .copy { grid-area: copy; white-space: nowrap; }
+/* 幅が足りないとき（iPhone など）はパスワードを2行目に */
+@media (max-width: 600px) {
+  .row { grid-template-areas: "label . eye copy" "pw pw pw pw"; }
+  .row .pw { font-size: 18px; }
+}
+button.eye {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+button.eye svg { width: 22px; height: 22px; }
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  white-space: nowrap;
+}
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--button);
+}
+.segmented button {
+  min-width: 42px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--text);
+}
+.segmented button[aria-pressed="true"] {
+  background: var(--seg-selected);
+  color: var(--seg-selected-text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+}
+.keyword-tools {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 16px;
+}
+.status {
+  color: var(--muted);
+  margin: 0 4px;
+  min-height: 1.4em;
+}
+.warning {
+  color: var(--danger);
+  padding: 14px 16px;
+  font-weight: 600;
+}
+.footer {
+  margin: 28px 4px 0;
+  font-size: 15px;
+  color: var(--muted);
+}
+.footer a { color: var(--accent); }
+/* パスワードの色分け：数字は青、小文字は赤、それ以外は通常色 */
+.pw .digit { color: var(--digit); }
+.pw .lower { color: var(--lower); }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>パスワード生成 <span class="badge">新方式</span></h1>
+  <p class="sub">暗証番号 ＋ キーワード3つ ＋ サイト名。現行方式とは別のパスワードになります。</p>
+
+  <div class="card" id="warning" hidden>
+    <div class="warning">⚠️ Python 版（3wordPasGen2.py）と同じ結果になりません。このブラウザで生成したパスワードは使わないでください。</div>
+  </div>
+
+  <p class="section-title">暗証番号（全サイト共通・4文字以上・数字以外も可）</p>
+  <div class="card">
+    <div class="field">
+      <input id="pin" class="secret" placeholder="暗証番号" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button type="button" class="eye" id="eye_pin" aria-label="暗証番号を表示" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="icon-show"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="icon-hide" hidden><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
+    </div>
+  </div>
+
+  <p class="section-title">キーワード</p>
+  <div class="card">
+    <input id="kw1" placeholder="キーワード1" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <input id="kw2" placeholder="キーワード2" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <input id="kw3" placeholder="キーワード3" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+  </div>
+
+  <p class="section-title">サイト名（URL を貼り付けても OK）</p>
+  <div class="card">
+    <input id="site" placeholder="例: amazon.co.jp" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+    <div class="note" id="site_note">小文字にそろえ、https:// ・ www. ・ / 以降は取り除いて使います</div>
+    <div class="keyword-tools">
+      <button type="button" id="copy_keywords">キーワード・サイト名をコピー</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="option">
+      <span>文字数</span>
+      <div class="segmented" role="group" aria-label="文字数">
+        <button type="button" data-length="12" aria-pressed="false">12</button>
+        <button type="button" data-length="16" aria-pressed="true">16</button>
+        <button type="button" data-length="20" aria-pressed="false">20</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="actions">
+      <button type="button" class="primary" id="generate">生成</button>
+      <button type="button" id="reset">リセット</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <span class="label">記号あり:</span>
+      <span class="pw" id="pw_symbols"></span>
+      <button type="button" class="eye" id="eye_symbols" aria-label="パスワードを表示" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="icon-show"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="icon-hide" hidden><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
+      <button type="button" class="copy" id="copy_symbols">コピー</button>
+    </div>
+    <div class="row">
+      <span class="label">記号なし:</span>
+      <span class="pw" id="pw_nosymbols"></span>
+      <button type="button" class="eye" id="eye_nosymbols" aria-label="パスワードを表示" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="icon-show"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="icon-hide" hidden><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
+      <button type="button" class="copy" id="copy_nosymbols">コピー</button>
+    </div>
+  </div>
+
+  <p class="status" id="status"></p>
+
+  <p class="footer">今まで作ったパスワードは <a href="3wordPasGen.html">現行方式のページ</a> で作れます（あちらは変更していません）。</p>
+</main>
+<script>
+"use strict";
+/*
+ * 3wordPasGen2（ブラウザ版・新方式）
+ * 3wordPasGen2.py と同じ入力から、同じパスワードを生成する。
+ * 材料: 暗証番号 + キーワード3つ + サイト名（それぞれ正規化してから NUL 区切りで連結）
+ * 現行の 3wordPasGen.html とは結果が異なる（別方式）。
+ * 外部ライブラリ・通信は一切使わない。
+ */
+const PasGen2 = (() => {
+
+  // ---------------------------------------------------------------
+  // UTF-8 / SHA-512（Python の hashlib.sha512 と同じ結果）
+  // ---------------------------------------------------------------
+  const utf8 = (text) => new TextEncoder().encode(text);
+
+  const SHA512_K = [
+    "428a2f98d728ae22", "7137449123ef65cd", "b5c0fbcfec4d3b2f", "e9b5dba58189dbbc",
+    "3956c25bf348b538", "59f111f1b605d019", "923f82a4af194f9b", "ab1c5ed5da6d8118",
+    "d807aa98a3030242", "12835b0145706fbe", "243185be4ee4b28c", "550c7dc3d5ffb4e2",
+    "72be5d74f27b896f", "80deb1fe3b1696b1", "9bdc06a725c71235", "c19bf174cf692694",
+    "e49b69c19ef14ad2", "efbe4786384f25e3", "0fc19dc68b8cd5b5", "240ca1cc77ac9c65",
+    "2de92c6f592b0275", "4a7484aa6ea6e483", "5cb0a9dcbd41fbd4", "76f988da831153b5",
+    "983e5152ee66dfab", "a831c66d2db43210", "b00327c898fb213f", "bf597fc7beef0ee4",
+    "c6e00bf33da88fc2", "d5a79147930aa725", "06ca6351e003826f", "142929670a0e6e70",
+    "27b70a8546d22ffc", "2e1b21385c26c926", "4d2c6dfc5ac42aed", "53380d139d95b3df",
+    "650a73548baf63de", "766a0abb3c77b2a8", "81c2c92e47edaee6", "92722c851482353b",
+    "a2bfe8a14cf10364", "a81a664bbc423001", "c24b8b70d0f89791", "c76c51a30654be30",
+    "d192e819d6ef5218", "d69906245565a910", "f40e35855771202a", "106aa07032bbd1b8",
+    "19a4c116b8d2d0c8", "1e376c085141ab53", "2748774cdf8eeb99", "34b0bcb5e19b48a8",
+    "391c0cb3c5c95a63", "4ed8aa4ae3418acb", "5b9cca4f7763e373", "682e6ff3d6b2b8a3",
+    "748f82ee5defb2fc", "78a5636f43172f60", "84c87814a1f0ab72", "8cc702081a6439ec",
+    "90befffa23631e28", "a4506cebde82bde9", "bef9a3f7b2c67915", "c67178f2e372532b",
+    "ca273eceea26619c", "d186b8c721c0c207", "eada7dd6cde0eb1e", "f57d4f7fee6ed178",
+    "06f067aa72176fba", "0a637dc5a2c898a6", "113f9804bef90dae", "1b710b35131c471b",
+    "28db77f523047d84", "32caab7b40c72493", "3c9ebe0a15c9bebc", "431d67c49c100d4c",
+    "4cc5d4becb3e42b6", "597f299cfc657e2a", "5fcb6fab3ad6faec", "6c44198c4a475817",
+  ].map((h) => BigInt("0x" + h));
+
+  const SHA512_H0 = [
+    "6a09e667f3bcc908", "bb67ae8584caa73b", "3c6ef372fe94f82b", "a54ff53a5f1d36f1",
+    "510e527fade682d1", "9b05688c2b3e6c1f", "1f83d9abfb41bd6b", "5be0cd19137e2179",
+  ].map((h) => BigInt("0x" + h));
+
+  const MASK64 = (1n << 64n) - 1n;
+  const rotr = (x, n) => ((x >> n) | (x << (64n - n))) & MASK64;
+
+  /** SHA-512 のダイジェスト（64 バイト）を返す */
+  function sha512(bytes) {
+    const bitLength = BigInt(bytes.length) * 8n;
+    const paddedLength = Math.ceil((bytes.length + 17) / 128) * 128;
+    const data = new Uint8Array(paddedLength);
+    data.set(bytes);
+    data[bytes.length] = 0x80;
+    for (let i = 0; i < 16; i++) {
+      data[paddedLength - 1 - i] = Number((bitLength >> BigInt(8 * i)) & 0xffn);
+    }
+
+    const h = SHA512_H0.slice();
+    const w = new Array(80);
+    for (let offset = 0; offset < paddedLength; offset += 128) {
+      for (let t = 0; t < 16; t++) {
+        let v = 0n;
+        for (let b = 0; b < 8; b++) v = (v << 8n) | BigInt(data[offset + t * 8 + b]);
+        w[t] = v;
+      }
+      for (let t = 16; t < 80; t++) {
+        const s0 = rotr(w[t - 15], 1n) ^ rotr(w[t - 15], 8n) ^ (w[t - 15] >> 7n);
+        const s1 = rotr(w[t - 2], 19n) ^ rotr(w[t - 2], 61n) ^ (w[t - 2] >> 6n);
+        w[t] = (w[t - 16] + s0 + w[t - 7] + s1) & MASK64;
+      }
+      let [a, b, c, d, e, f, g, hh] = h;
+      for (let t = 0; t < 80; t++) {
+        const S1 = rotr(e, 14n) ^ rotr(e, 18n) ^ rotr(e, 41n);
+        const ch = (e & f) ^ (~e & MASK64 & g);
+        const temp1 = (hh + S1 + ch + SHA512_K[t] + w[t]) & MASK64;
+        const S0 = rotr(a, 28n) ^ rotr(a, 34n) ^ rotr(a, 39n);
+        const maj = (a & b) ^ (a & c) ^ (b & c);
+        const temp2 = (S0 + maj) & MASK64;
+        hh = g; g = f; f = e;
+        e = (d + temp1) & MASK64;
+        d = c; c = b; b = a;
+        a = (temp1 + temp2) & MASK64;
+      }
+      h[0] = (h[0] + a) & MASK64; h[1] = (h[1] + b) & MASK64;
+      h[2] = (h[2] + c) & MASK64; h[3] = (h[3] + d) & MASK64;
+      h[4] = (h[4] + e) & MASK64; h[5] = (h[5] + f) & MASK64;
+      h[6] = (h[6] + g) & MASK64; h[7] = (h[7] + hh) & MASK64;
+    }
+
+    const out = new Uint8Array(64);
+    for (let i = 0; i < 8; i++) {
+      for (let b = 0; b < 8; b++) {
+        out[i * 8 + b] = Number((h[i] >> BigInt(56 - 8 * b)) & 0xffn);
+      }
+    }
+    return out;
+  }
+
+  const toHex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+
+  // ---------------------------------------------------------------
+  // Python の random（CPython の Mersenne Twister, MT19937）
+  // ---------------------------------------------------------------
+  const N = 624;
+  const M = 397;
+
+  class PythonRandom {
+    /** random.seed(text)（version=2、文字列シード）と同じ初期化 */
+    constructor(seedText) {
+      this.mt = new Uint32Array(N);
+      this.index = N;
+
+      const textBytes = utf8(seedText);
+      const digest = sha512(textBytes);
+      // 「文字列の UTF-8 + その SHA-512」をビッグエンディアンの巨大な整数とみなす
+      let bytes = new Uint8Array(textBytes.length + digest.length);
+      bytes.set(textBytes);
+      bytes.set(digest, textBytes.length);
+      const pad = (4 - (bytes.length % 4)) % 4;
+      if (pad) {
+        const padded = new Uint8Array(bytes.length + pad);
+        padded.set(bytes, pad);
+        bytes = padded;
+      }
+      // 下位から 32 ビットずつ区切って init_by_array のキーにする
+      const key = [];
+      for (let i = bytes.length; i > 0; i -= 4) {
+        key.push(((bytes[i - 4] << 24) | (bytes[i - 3] << 16) | (bytes[i - 2] << 8) | bytes[i - 1]) >>> 0);
+      }
+      while (key.length > 1 && key[key.length - 1] === 0) key.pop();
+      if (key.length === 0) key.push(0);
+
+      this.initByArray(key);
+    }
+
+    initGenrand(s) {
+      const mt = this.mt;
+      mt[0] = s >>> 0;
+      for (let i = 1; i < N; i++) {
+        mt[i] = (Math.imul(1812433253, mt[i - 1] ^ (mt[i - 1] >>> 30)) + i) >>> 0;
+      }
+      this.index = N;
+    }
+
+    initByArray(key) {
+      const mt = this.mt;
+      this.initGenrand(19650218);
+      let i = 1;
+      let j = 0;
+      for (let k = Math.max(N, key.length); k > 0; k--) {
+        mt[i] = ((mt[i] ^ Math.imul(mt[i - 1] ^ (mt[i - 1] >>> 30), 1664525)) + key[j] + j) >>> 0;
+        i++; j++;
+        if (i >= N) { mt[0] = mt[N - 1]; i = 1; }
+        if (j >= key.length) j = 0;
+      }
+      for (let k = N - 1; k > 0; k--) {
+        mt[i] = ((mt[i] ^ Math.imul(mt[i - 1] ^ (mt[i - 1] >>> 30), 1566083941)) - i) >>> 0;
+        i++;
+        if (i >= N) { mt[0] = mt[N - 1]; i = 1; }
+      }
+      mt[0] = 0x80000000;
+      this.index = N;
+    }
+
+    twist() {
+      const mt = this.mt;
+      for (let k = 0; k < N; k++) {
+        const y = (mt[k] & 0x80000000) | (mt[(k + 1) % N] & 0x7fffffff);
+        mt[k] = (mt[(k + M) % N] ^ (y >>> 1) ^ ((y & 1) ? 0x9908b0df : 0)) >>> 0;
+      }
+      this.index = 0;
+    }
+
+    /** 32 ビットの乱数（genrand_uint32） */
+    nextUint32() {
+      if (this.index >= N) this.twist();
+      let y = this.mt[this.index++];
+      y ^= y >>> 11;
+      y ^= (y << 7) & 0x9d2c5680;
+      y ^= (y << 15) & 0xefc60000;
+      y ^= y >>> 18;
+      return y >>> 0;
+    }
+
+    /** random.random() */
+    random() {
+      const a = this.nextUint32() >>> 5;
+      const b = this.nextUint32() >>> 6;
+      return (a * 67108864 + b) * (1 / 9007199254740992);
+    }
+
+    /** random.getrandbits(k)（1〜32） */
+    getrandbits(k) {
+      return this.nextUint32() >>> (32 - k);
+    }
+
+    /** random._randbelow(n) */
+    randbelow(n) {
+      const k = 32 - Math.clz32(n); // n.bit_length()
+      let r = this.getrandbits(k);
+      while (r >= n) r = this.getrandbits(k);
+      return r;
+    }
+
+    /** random.choices(population, k=count) */
+    choices(population, count) {
+      const n = population.length;
+      const result = [];
+      for (let i = 0; i < count; i++) result.push(population[Math.floor(this.random() * n)]);
+      return result;
+    }
+
+    /** random.sample(population, k=count) */
+    sample(population, count) {
+      const n = population.length;
+      if (count < 0 || count > n) throw new RangeError("Sample larger than population or is negative");
+      const result = [];
+      let setsize = 21;
+      if (count > 5) setsize += 4 ** Math.ceil(Math.log(count * 3) / Math.log(4));
+      if (n <= setsize) {
+        const pool = population.slice();
+        for (let i = 0; i < count; i++) {
+          const j = this.randbelow(n - i);
+          result.push(pool[j]);
+          pool[j] = pool[n - i - 1];
+        }
+      } else {
+        const selected = new Set();
+        for (let i = 0; i < count; i++) {
+          let j = this.randbelow(n);
+          while (selected.has(j)) j = this.randbelow(n);
+          selected.add(j);
+          result.push(population[j]);
+        }
+      }
+      return result;
+    }
+
+    /** random.shuffle(list) */
+    shuffle(list) {
+      for (let i = list.length - 1; i > 0; i--) {
+        const j = this.randbelow(i + 1);
+        [list[i], list[j]] = [list[j], list[i]];
+      }
+    }
+  }
+  // ---------------------------------------------------------------
+  // 入力の前処理（3wordPasGen2.py の normalize_text / normalize_site と同じ）
+  // ---------------------------------------------------------------
+  // Python の str.isspace() が真になる文字
+  const PY_WHITESPACE = new Set([
+    0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x85, 0xa0,
+    0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007,
+    0x2008, 0x2009, 0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000,
+  ]);
+  const isSpace = (ch) => PY_WHITESPACE.has(ch.codePointAt(0));
+
+  /** 前後の空白を除去し、全角→半角（NFKC）。キーワード・暗証番号用 */
+  function normalizeText(text) {
+    const chars = Array.from(text); // コードポイント単位
+    let start = 0;
+    let end = chars.length;
+    while (start < end && isSpace(chars[start])) start++;
+    while (end > start && isSpace(chars[end - 1])) end--;
+    return chars.slice(start, end).join("").normalize("NFKC");
+  }
+
+  /** サイト名の表記をそろえる（例: "https://www.Amazon.co.jp/gp/cart" → "amazon.co.jp"） */
+  function normalizeSite(text) {
+    let s = text.normalize("NFKC").toLowerCase();
+    s = Array.from(s).filter((ch) => !isSpace(ch)).join("");  // 空白をすべて除去
+    s = s.replace(/^[a-z][a-z0-9+.\-]*:\/\//, "");            // https:// など
+    s = s.split(/[\/?#]/)[0];                                   // パス・? ・# 以降
+    s = s.replace(/:[0-9]*$/, "");                             // ポート番号
+    if (s.startsWith("www.")) s = s.slice(4);
+    s = s.replace(/\.+$/, "");                                 // 末尾の「.」
+    return s;
+  }
+
+  // ---------------------------------------------------------------
+  // パスワード生成（3wordPasGen2.py の generate_password と同じ）
+  // ---------------------------------------------------------------
+  const VERSION_TAG = "3wordPasGen2";
+  const MIN_PIN_LENGTH = 4;
+  const UPPERCASE = Array.from("ABCDEFGHIJKLMNOPQRSTUVWXYZ").filter((c) => c !== "O");
+  const LOWERCASE = Array.from("abcdefghijklmnopqrstuvwxyz").filter((c) => c !== "l");
+  const DIGITS = Array.from("0123456789").filter((c) => !"10".includes(c));
+  const SYMBOLS = Array.from("!#@$%&*()=+?/");
+
+  /** 入力のチェック。問題があればメッセージ、なければ空文字 */
+  function validate(pin, site) {
+    if (Array.from(pin).length < MIN_PIN_LENGTH) return `暗証番号は${MIN_PIN_LENGTH}文字以上にしてください。`;
+    if (!site) return "サイト名を入力してください。";
+    return "";
+  }
+
+  /** 引数はすべて正規化済みのもの */
+  function generatePassword(pin, keywords, site, useSymbols = true, length = 16) {
+    const error = validate(pin, site);
+    if (error) throw new RangeError(error);
+    const message = [VERSION_TAG, pin, ...keywords, site].join("\0");
+    const rng = new PythonRandom(toHex(sha512(utf8(message))));
+
+    // 大文字・小文字・数字を必ず2文字ずつ入れる
+    let passwordChars = [];
+    passwordChars = passwordChars.concat(rng.sample(UPPERCASE, 2));
+    passwordChars = passwordChars.concat(rng.sample(LOWERCASE, 2));
+    passwordChars = passwordChars.concat(rng.sample(DIGITS, 2));
+    let usedLength = 6;
+
+    if (useSymbols) {
+      if (length < 8) throw new RangeError("記号ありの場合は最低8文字必要です。");
+      passwordChars = passwordChars.concat(rng.sample(SYMBOLS, 2));
+      usedLength += 2;
+    }
+
+    // 残りは全種類から選ぶ
+    const pool = UPPERCASE.concat(LOWERCASE, DIGITS, useSymbols ? SYMBOLS : []);
+    passwordChars = passwordChars.concat(rng.choices(pool, Math.max(0, length - usedLength)));
+    rng.shuffle(passwordChars);
+    return passwordChars.join("");
+  }
+
+  // ---------------------------------------------------------------
+  // Python 版との互換性チェック（3wordPasGen2.py で実際に生成した値）
+  // ---------------------------------------------------------------
+  const SITE_VECTORS = [
+    ["https://www.Amazon.co.jp/gp/cart", "amazon.co.jp"],
+    ["  ＷＷＷ．Ｇｏｏｇｌｅ．ｃｏｍ  ", "google.com"],
+    ["http://localhost:8080/path?q=1#top", "localhost"],
+    ["example.com.", "example.com"],
+    ["My Bank", "mybank"],
+    ["accounts.google.com", "accounts.google.com"],
+    ["ゆうちょ", "ゆうちょ"],
+  ];
+  const COMPATIBILITY_VECTORS = [
+    ["1234", ["apple", "banana", "cherry"], "amazon.co.jp", 16, "dmr3?SP)k2Y!YNJ9", "3KY9xUmjYPfHLrJk"],
+    ["０９８７", ["ａｐｐｌｅ", "  banana ", "ｶﾀｶﾅ"], "https://www.Amazon.co.jp/gp/cart", 12, "z39QIm&/=%ip", "j39QImUn2yiI"],
+    ["秘密の芯!", ["パスワード", "東京", "🍎"], "Google", 20, "(vEUyY$8EjTn9UB9Wg3&", "kY2HMkcnrfMdjzEJ9WU3"],
+    ["abcd", ["", "", ""], "x", 16, "Q8VQ)2VwHfRD*ixR", "QnxCG2NgcMfRRnR8"],
+    ["1234", ["ab", "c", ""], "example.com", 16, "Pm?2gkW*dq2mbV8Z", "aer2fYWRZrq8mvWL"],
+    ["1234", ["a", "bc", ""], "example.com", 16, "FI54X?5*Qz4t&=T(", "iI53f2n2nz4tw4Tc"],
+  ];
+
+  function passesCompatibilityCheck() {
+    try {
+      return SITE_VECTORS.every(([input, expected]) => normalizeSite(input) === expected)
+        && COMPATIBILITY_VECTORS.every(([pin, kws, site, length, symbols, noSymbols]) => {
+          const p = normalizeText(pin);
+          const k = kws.map(normalizeText);
+          const s = normalizeSite(site);
+          return generatePassword(p, k, s, true, length) === symbols
+            && generatePassword(p, k, s, false, length) === noSymbols;
+        });
+    } catch (e) {
+      return false;
+    }
+  }
+
+  return { generatePassword, normalizeText, normalizeSite, validate, passesCompatibilityCheck };
+})();
+
+// -----------------------------------------------------------------
+// 画面の処理
+// -----------------------------------------------------------------
+if (typeof document !== "undefined") {
+  const $ = (id) => document.getElementById(id);
+  const pinInput = $("pin");
+  const keywordInputs = [$("kw1"), $("kw2"), $("kw3")];
+  const siteInput = $("site");
+  const allInputs = [pinInput, ...keywordInputs, siteInput];
+  const DEFAULT_LENGTH = 16;
+  const SITE_NOTE_DEFAULT = $("site_note").textContent;
+  const rows = {
+    pw_symbols: { useSymbols: true, name: "記号あり", password: "", visible: false, eye: $("eye_symbols") },
+    pw_nosymbols: { useSymbols: false, name: "記号なし", password: "", visible: false, eye: $("eye_nosymbols") },
+  };
+  const lengthButtons = Array.from(document.querySelectorAll(".segmented button"));
+  let length = DEFAULT_LENGTH;
+  let usedSite = "";
+
+  const setStatus = (text, isError = false) => {
+    $("status").textContent = text;
+    $("status").style.color = isError ? "var(--danger)" : "";
+  };
+
+  // 目のマークのアイコン切り替え
+  function setEyeIcon(button, visible, what) {
+    button.setAttribute("aria-pressed", String(visible));
+    button.setAttribute("aria-label", visible ? `${what}を隠す` : `${what}を表示`);
+    // SVG には .hidden プロパティが無いので属性で切り替える
+    button.querySelector(".icon-show").toggleAttribute("hidden", visible);
+    button.querySelector(".icon-hide").toggleAttribute("hidden", !visible);
+  }
+
+  // 暗証番号の表示 / 伏せ字
+  function setPinVisible(visible) {
+    pinInput.classList.toggle("secret", !visible);
+    setEyeIcon($("eye_pin"), visible, "暗証番号");
+  }
+
+  // サイト名：実際に使われる表記をその場で表示
+  function updateSiteNote() {
+    const note = $("site_note");
+    const site = PasGen2.normalizeSite(siteInput.value);
+    note.textContent = "";
+    note.classList.remove("error");
+    if (!site) {
+      note.textContent = SITE_NOTE_DEFAULT;
+      return;
+    }
+    note.append("使う表記: ");
+    const span = document.createElement("span");
+    span.className = "site";
+    span.textContent = site;
+    note.appendChild(span);
+  }
+
+  // パスワードを表示（伏せ字のときは●、表示中は数字を青・小文字を赤にする。コピーされる文字列は変わらない）
+  function render(id) {
+    const row = rows[id];
+    const element = $(id);
+    element.textContent = "";
+    if (!row.password) return;
+    if (!row.visible) {
+      element.textContent = "●".repeat(Array.from(row.password).length);
+      return;
+    }
+    for (const ch of row.password) {
+      const kind = /[0-9]/.test(ch) ? "digit" : /[a-z]/.test(ch) ? "lower" : "";
+      if (kind) {
+        const span = document.createElement("span");
+        span.className = kind;
+        span.textContent = ch;
+        element.appendChild(span);
+      } else {
+        element.appendChild(document.createTextNode(ch));
+      }
+    }
+  }
+
+  function setVisible(id, visible) {
+    rows[id].visible = visible;
+    setEyeIcon(rows[id].eye, visible, "パスワード");
+    render(id);
+  }
+
+  function clearPasswords() {
+    for (const [id, row] of Object.entries(rows)) {
+      row.password = "";
+      setVisible(id, false);
+    }
+    usedSite = "";
+  }
+
+  // 生成処理（文字数は選択中のもの）。成功したら true
+  function generatePasswords() {
+    const pin = PasGen2.normalizeText(pinInput.value);
+    const keywords = keywordInputs.map((input) => PasGen2.normalizeText(input.value));
+    const site = PasGen2.normalizeSite(siteInput.value);
+    const error = PasGen2.validate(pin, site);
+    if (error) {
+      clearPasswords();
+      setStatus(error, true);
+      (Array.from(pin).length < 4 ? pinInput : siteInput).focus();
+      return false;
+    }
+    for (const [id, row] of Object.entries(rows)) {
+      row.password = PasGen2.generatePassword(pin, keywords, site, row.useSymbols, length);
+      render(id);
+    }
+    usedSite = site;
+    setStatus(`「${site}」用・${length}文字で生成しました`);
+    return true;
+  }
+
+  // 文字数の切り替え（生成済みなら同じ入力で作り直す）
+  function setLength(newLength) {
+    length = newLength;
+    lengthButtons.forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.length) === length)));
+    if (rows.pw_symbols.password) generatePasswords();
+  }
+
+  // クリップボードへコピー（使えない環境では従来の方法で）
+  async function writeClipboard(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) { /* 下の方法を試す */ }
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.top = "-1000px";
+    document.body.appendChild(area);
+    area.select();
+    area.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(area);
+    return ok;
+  }
+
+  // パスワードのコピー（伏せ字のままでも本物のパスワードがコピーされる）
+  async function copyPassword(id) {
+    const row = rows[id];
+    if (!row.password) {
+      setStatus("先に生成してください");
+      return;
+    }
+    const ok = await writeClipboard(row.password);
+    setStatus(ok ? `${row.name}（${usedSite}・${length}文字）をコピーしました` : "コピーできませんでした", !ok);
+  }
+
+  // キーワード3つ＋サイト名（そろえた表記）を1行に1つずつコピー。暗証番号は含めない
+  async function copyKeywords() {
+    const values = keywordInputs.map((input) => input.value);
+    const site = PasGen2.normalizeSite(siteInput.value);
+    if (values.every((v) => v === "") && !site) {
+      setStatus("先にキーワードを入力してください");
+      return;
+    }
+    const ok = await writeClipboard(values.concat(site).join("\n"));
+    setStatus(ok ? "キーワード3つとサイト名をコピーしました（暗証番号は含みません）" : "コピーできませんでした", !ok);
+  }
+
+  // リセット処理（暗証番号も消す。文字数も初期値に戻し、伏せ字に戻す）
+  function resetFields() {
+    allInputs.forEach((input) => { input.value = ""; });
+    setPinVisible(false);
+    clearPasswords();
+    updateSiteNote();
+    setLength(DEFAULT_LENGTH);
+    setStatus("リセットしました");
+  }
+
+  $("generate").addEventListener("click", () => {
+    if (generatePasswords()) {
+      setVisible("pw_symbols", false);
+      setVisible("pw_nosymbols", false);
+    }
+  });
+  $("reset").addEventListener("click", resetFields);
+  $("copy_keywords").addEventListener("click", copyKeywords);
+  $("eye_pin").addEventListener("click", () => setPinVisible(pinInput.classList.contains("secret")));
+  for (const id of Object.keys(rows)) {
+    rows[id].eye.addEventListener("click", () => setVisible(id, !rows[id].visible));
+    $(id.replace("pw_", "copy_")).addEventListener("click", () => copyPassword(id));
+  }
+  lengthButtons.forEach((b) => b.addEventListener("click", () => setLength(Number(b.dataset.length))));
+  siteInput.addEventListener("input", updateSiteNote);
+
+  // 入力を変えたら、古い入力で作ったパスワードは消す（別サイト用を取り違えないように）
+  allInputs.forEach((input) => input.addEventListener("input", () => {
+    if (rows.pw_symbols.password) {
+      clearPasswords();
+      setStatus("入力が変わったので、もう一度「生成」してください");
+    }
+  }));
+
+  // Enter キーで次の入力欄へ、最後の欄なら生成
+  allInputs.forEach((input, i) => {
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || e.isComposing) return;
+      e.preventDefault();
+      if (i < allInputs.length - 1) allInputs[i + 1].focus();
+      else { input.blur(); $("generate").click(); }
+    });
+  });
+
+  // 起動時に Python 版と同じ結果になるか確認
+  if (!PasGen2.passesCompatibilityCheck()) {
+    $("warning").hidden = false;
+    $("generate").disabled = true;
+  }
+
+  // オフラインで使えるように、ページを端末に保存する（https で開いたときのみ）
+  if ("serviceWorker" in navigator && window.isSecureContext && location.protocol !== "file:") {
+    navigator.serviceWorker.register("sw.js").catch(() => { /* 保存できなくても通常どおり使える */ });
+  }
+}
+</script>
+</body>
+</html>
