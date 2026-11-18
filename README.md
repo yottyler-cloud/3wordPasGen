@@ -29,7 +29,16 @@ Python の `random`（Mersenne Twister）の `seed` / `choices` / `sample` / `sh
 - ページ内の CSP（Content-Security-Policy）で、**外部への通信をすべて禁止**しています。
 - SHA-512 も自前で実装しているので、ネットに置かず、ファイルを開くだけでも動きます。
 - 起動時に Python 版で生成した値と照合し、一致しない場合は警告を出して「生成」を無効にします。
+- Service Worker（`web/sw.js`）で、初回に開いたときにページを端末に保存します。以後は保存した物だけを使うので、機内モードでも動きます。
+  公開中のファイルが後から書き換えられても、保存済みのページは変わりません。
+- アプリを更新したら `web/sw.js` の `CACHE_VERSION` を上げてください（上げないと端末側が更新されません）。
 - `<script>` や `<style>` を書き換えたら、`python3 web/update_csp.py` を実行して CSP のハッシュを更新してください（しないとページが動かなくなります）。
+
+## 使い方（ブラウザ版 / iPad）
+1. Safari で `https://yottyler-cloud.github.io/3wordPasGen/web/3wordPasGen.html` を開きます。
+2. 共有ボタン →「ホーム画面に追加」。
+3. ホーム画面のアイコンから**一度オンラインで**開きます（ここで端末に保存されます）。
+4. 以後は機内モードでも使えます。
 
 ## 使い方（Swift 版 / iPad）
 1. `ios/3wordPasGen.swiftpm` フォルダを iPad の「ファイル」に置きます。

@@ -3,10 +3,18 @@
 <head>
 <meta charset="utf-8">
 <!-- 通信禁止：このページは外部への通信・外部ファイルの読み込みを一切行わない -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-KSJm0Lulg94Gtl8SaL1eOdkel1XAU8xXncyHPhRZLFU='; style-src 'sha256-L/Sqk7aO7BGftZTkVvtUammIgtZzkUuDma0seeI9UUs='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JS23u/DwKIYXHdLOwg7xteAoGhyDO3REf1mz/0Htqnk='; style-src 'sha256-L/Sqk7aO7BGftZTkVvtUammIgtZzkUuDma0seeI9UUs='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="format-detection" content="telephone=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="3wordPasGen">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f2f2f7">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <title>3wordPasGen</title>
 <style>
 :root {
@@ -551,6 +559,11 @@ if (typeof document !== "undefined") {
   if (!ThreeWordPasGen.passesCompatibilityCheck()) {
     $("warning").hidden = false;
     $("generate").disabled = true;
+  }
+
+  // オフラインで使えるように、ページを端末に保存する（https で開いたときのみ）
+  if ("serviceWorker" in navigator && window.isSecureContext && location.protocol !== "file:") {
+    navigator.serviceWorker.register("sw.js").catch(() => { /* 保存できなくても通常どおり使える */ });
   }
 }
 </script>
