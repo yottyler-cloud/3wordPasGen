@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- 通信禁止：このページは外部への通信・外部ファイルの読み込みを一切行わない -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-xvtxXeKyTCFkf9pSPAYMjMeUTwihd00QB613Oj5Rgo0='; style-src 'sha256-g7G/CcoHMDZ9Ydezzf4LeBihYT7Zoh+SC/pe7yPbulc='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-xvtxXeKyTCFkf9pSPAYMjMeUTwihd00QB613Oj5Rgo0='; style-src 'sha256-yvj9e5lL/m6BhPAQJnvU2JnygXS3nVQvu6nVCjsbJS0='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="format-detection" content="telephone=no">
@@ -141,6 +141,7 @@ button.eye svg { width: 22px; height: 22px; }
   justify-content: space-between;
   gap: 12px;
   padding: 10px 16px;
+  white-space: nowrap;
 }
 .segmented {
   display: flex;
@@ -150,7 +151,8 @@ button.eye svg { width: 22px; height: 22px; }
   background: var(--button);
 }
 .segmented button {
-  padding: 6px 18px;
+  min-width: 42px;
+  padding: 6px 8px;
   background: transparent;
   color: var(--text);
 }
@@ -201,6 +203,7 @@ button.eye svg { width: 22px; height: 22px; }
     <div class="option">
       <span>文字数</span>
       <div class="segmented" role="group" aria-label="文字数">
+        <button type="button" data-length="8" aria-pressed="false">8</button>
         <button type="button" data-length="12" aria-pressed="true">12</button>
         <button type="button" data-length="16" aria-pressed="false">16</button>
         <button type="button" data-length="20" aria-pressed="false">20</button>
