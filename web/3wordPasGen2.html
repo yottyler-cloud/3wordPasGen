@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- 通信禁止：このページは外部への通信・外部ファイルの読み込みを一切行わない -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-HlYmt0Zn+863YV10WUiQ0/cnpAWtLIlQh/vliON9VpY='; style-src 'sha256-fIhEa3rs+D888+DpRG+iTNT/EAqDFkdl4piIBIwdfHc='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ezOnBBIuAuFSfCV0loQSAkf6nWfRC+dFI9zZhntfNSU='; style-src 'sha256-z6PVW9L+qAs8azW9OMruCE9I/ERIBAE1o1DS/PxCfTQ='; img-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="format-detection" content="telephone=no">
@@ -111,6 +111,8 @@ input {
 input::placeholder { color: var(--muted); }
 /* 暗証番号は伏せ字（type=password にするとパスワード管理機能が保存を勧めてくるため、表示だけ伏せる） */
 input.secret { -webkit-text-security: disc; text-security: disc; }
+/* 表示にするときは「伏せない」をはっきり指定する（指定を外すだけだと iPad の Safari が●のままになる） */
+input.revealed { -webkit-text-security: none; text-security: none; }
 .field {
   display: flex;
   align-items: center;
@@ -789,6 +791,14 @@ if (typeof document !== "undefined") {
   // 暗証番号の表示 / 伏せ字
   function setPinVisible(visible) {
     pinInput.classList.toggle("secret", !visible);
+    pinInput.classList.toggle("revealed", visible);
+    // Safari は表示方法を変えても文字を描き直さないことがあるので、中身を入れ直して描き直させる
+    const value = pinInput.value;
+    pinInput.style.display = "none";
+    void pinInput.offsetHeight;
+    pinInput.style.display = "";
+    pinInput.value = "";
+    pinInput.value = value;
     setEyeIcon($("eye_pin"), visible, "暗証番号");
   }
 
