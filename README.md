@@ -23,7 +23,7 @@
 | `web/3wordPasGen.html` | ブラウザ版（HTML 1枚。Safari / Chrome 用） |
 | `web/3wordPasGen2.html` | **新方式**のブラウザ版（下の「新方式」参照） |
 | `3wordPasGen2.py` | **新方式**の Python 版（Pythonista 3 用） |
-| `ios/3wordPasGen.swiftpm/` | iOS ネイティブ版（SwiftUI。Xcode / Swift Playgrounds 用。旧版・最新版をトグルで切替） |
+| `ios/3wordPasGen.swiftpm/` | iOS ネイティブ版（SwiftUI。Xcode / Swift Playgrounds 用。最初の版・現行・新方式を切替） |
 
 ブラウザ版・iOS 版とも Python 版と**同じキーワードから同じパスワード**を生成します。
 Python の `random`（Mersenne Twister）の `seed` / `choices` / `sample` / `shuffle` と
@@ -80,18 +80,25 @@ Python の `random`（Mersenne Twister）の `seed` / `choices` / `sample` / `sh
 - SwiftUI で作った iPhone / iPad 向けアプリです。`ios/3wordPasGen.swiftpm` を **Xcode**（Mac）で開き、
   シミュレータか実機にビルドして使います（Swift Playgrounds でも開けますが、実行環境によっては
   ソフトウェアキーボードが出ないことがあるため、Xcode での実機ビルドを推奨します）。
-- **旧版 / 最新版をトグルで切り替え**できます。
-  - 最新版: 大文字・小文字・数字を必ず2文字ずつ（記号ありは記号も2文字）含める方式。
-  - 旧版: 最初のバージョン（英数字からランダムに選ぶ方式）。
-- 文字数は 8 / 12 / 16 / 20（初期値12）。パスワードは●で伏せ字表示（目のマークで切替）、数字は青・小文字は赤で色分け、キーワード一括コピーに対応。
-- 生成ロジックは `PythonRandom.swift`（MT19937 の移植）＋ `PasswordGenerator.swift`。起動時に Python 版で生成した値（旧版・最新版の両方）と照合し、一致しない場合は警告を表示します。
+- 画面上部の切り替えで、**3つの方式**を選べます（最後に選んだ方式を覚えます。入力内容は保存しません）。
+  - **最初の版**: 一番最初の方式（英数字からランダムに選ぶ。文字種の保証なし）。
+  - **現行**: 大文字・小文字・数字を必ず2文字ずつ（記号ありは記号も2文字）含める方式。ブラウザ版（青）・`3wordPasGen.py` と同じ。
+  - **新方式**: 暗証番号＋キーワード3つ＋サイト名を PBKDF2-HMAC-SHA512（210,000回）で計算する方式。
+    ブラウザ版（緑）・`3wordPasGen2.py` と同じ。選ぶと暗証番号・サイト名の欄が出て、色が緑になります。
+    暗証番号は文字数に関係なく常に●10個で表示（目のマークで表示）。
+- 文字数は 8 / 12 / 16 / 20（初期値12）。新方式は 12 / 16 / 20（初期値16）。
+- パスワードは●で伏せ字表示（目のマークで切替）、数字は青・小文字は赤で色分け。入力を変えると結果は消えます。
+- 生成ロジックは `PythonRandom.swift`（MT19937 の移植）＋ `PasswordGenerator.swift`（PBKDF2 は CommonCrypto）。
+  起動時に Python 版で生成した値（3方式とも）と照合し、一致しない場合は警告を出して「生成」を無効にします。
 - 通信は一切行いません。キーボードの自動大文字化・自動修正はオフ（入力が勝手に変わると別のパスワードになるため）。
+- GitHub Actions（`.github/workflows/ios-check.yml`）で、macOS 上で生成ロジックの照合と iOS シミュレーター向けビルドを確認しています。
 
 ## 使い方（iOS ネイティブ版 / Mac + Xcode）
 1. `ios/3wordPasGen.swiftpm` を Xcode で開きます。
 2. 実行先にシミュレータか接続した iPhone / iPad を選び、ビルドして実行します。
-3. 画面上部のトグルで方式（旧版 / 最新版）を選びます。
-4. キーワードを3つ入力し、文字数を選んで「生成」をタップします。
+   実機に入れるときは、Xcode の Signing & Capabilities で自分の Apple ID（Team）を選びます。
+3. 画面上部の切り替えで方式（最初の版 / 現行 / 新方式）を選びます。
+4. キーワードを3つ（新方式は暗証番号とサイト名も）入力し、文字数を選んで「生成」をタップします。
 5. 目のマークで表示 / 伏せ字を切り替え、「コピー」でクリップボードにコピーします。
 
 ## 使い方（Python 版 / Pythonista）
