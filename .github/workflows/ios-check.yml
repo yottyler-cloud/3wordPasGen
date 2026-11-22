@@ -1,0 +1,25 @@
+# iOS 版（ios/3wordPasGen.swiftpm）の確認。macOS 上で次の2つを行う。
+#  1. 生成ロジックを Python 版で作った値と照合する（3方式とも）
+#  2. アプリを iOS シミュレーター向けにビルドできるか確かめる
+name: iOS check
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/new-session-w0qzsy]
+    paths: ["ios/**", ".github/workflows/ios-check.yml"]
+jobs:
+  check:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Logic test
+        run: |
+          cd ios
+          swiftc -O 3wordPasGen.swiftpm/PythonRandom.swift 3wordPasGen.swiftpm/PasswordGenerator.swift checks/main.swift -o /tmp/logic
+          /tmp/logic
+      - name: Build app for iOS Simulator
+        run: |
+          cd ios/3wordPasGen.swiftpm
+          xcodebuild -list || true
+          xcodebuild -scheme 3wordPasGen -destination 'generic/platform=iOS Simulator' -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO | tail -40
+          test ${PIPESTATUS[0]} -eq 0
