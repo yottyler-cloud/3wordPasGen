@@ -21,13 +21,11 @@
 |---|---|
 | `3wordPasGen.py` | Python 版（Pythonista 3 用） |
 | `web/3wordPasGen.html` | ブラウザ版（HTML 1枚。Safari / Chrome 用） |
-| `ios/3wordPasGen.swiftpm/` | Swift 版（**旧方式のまま・未更新**。Swift Playgrounds ではキーボードが出ないため保留中） |
+| `ios/3wordPasGen.swiftpm/` | iOS ネイティブ版（SwiftUI。Xcode / Swift Playgrounds 用。旧版・最新版をトグルで切替） |
 
-ブラウザ版は Python 版と**同じキーワードから同じパスワード**を生成します。
+ブラウザ版・iOS 版とも Python 版と**同じキーワードから同じパスワード**を生成します。
 Python の `random`（Mersenne Twister）の `seed` / `choices` / `sample` / `shuffle` と
-`hashlib.sha512` を、同じ動作になるよう JavaScript で移植しています。
-
-※ Swift 版は旧方式（文字種を保証しない版）の生成ロジックのままです。現在の Python 版とは結果が異なります。
+`hashlib.sha512` を、同じ動作になるよう移植しています（ブラウザ版は JavaScript、iOS 版は Swift）。
 
 ## ブラウザ版について
 - HTML ファイル1枚だけで動きます。外部のファイルやライブラリは読み込みません。
@@ -45,13 +43,23 @@ Python の `random`（Mersenne Twister）の `seed` / `choices` / `sample` / `sh
 3. ホーム画面のアイコンから**一度オンラインで**開きます（ここで端末に保存されます）。
 4. 以後は機内モードでも使えます。
 
-## 使い方（Swift 版 / iPad）
-1. `ios/3wordPasGen.swiftpm` フォルダを iPad の「ファイル」に置きます。
-2. Swift Playgrounds で開いて実行します（Mac の場合は Xcode でも開けます）。
-3. キーワードを3つ入力して「生成」をタップします。
-4. 「記号ありコピー」または「記号なしコピー」でクリップボードにコピーします。
+## iOS ネイティブ版について
+- SwiftUI で作った iPhone / iPad 向けアプリです。`ios/3wordPasGen.swiftpm` を **Xcode**（Mac）で開き、
+  シミュレータか実機にビルドして使います（Swift Playgrounds でも開けますが、実行環境によっては
+  ソフトウェアキーボードが出ないことがあるため、Xcode での実機ビルドを推奨します）。
+- **旧版 / 最新版をトグルで切り替え**できます。
+  - 最新版: 大文字・小文字・数字を必ず2文字ずつ（記号ありは記号も2文字）含める方式。
+  - 旧版: 最初のバージョン（英数字からランダムに選ぶ方式）。
+- 文字数は 8 / 12 / 16 / 20（初期値12）。パスワードは●で伏せ字表示（目のマークで切替）、数字は青・小文字は赤で色分け、キーワード一括コピーに対応。
+- 生成ロジックは `PythonRandom.swift`（MT19937 の移植）＋ `PasswordGenerator.swift`。起動時に Python 版で生成した値（旧版・最新版の両方）と照合し、一致しない場合は警告を表示します。
+- 通信は一切行いません。キーボードの自動大文字化・自動修正はオフ（入力が勝手に変わると別のパスワードになるため）。
 
-キーボードの自動大文字化・自動修正はオフにしてあります（入力が勝手に変わると別のパスワードになるため）。
+## 使い方（iOS ネイティブ版 / Mac + Xcode）
+1. `ios/3wordPasGen.swiftpm` を Xcode で開きます。
+2. 実行先にシミュレータか接続した iPhone / iPad を選び、ビルドして実行します。
+3. 画面上部のトグルで方式（旧版 / 最新版）を選びます。
+4. キーワードを3つ入力し、文字数を選んで「生成」をタップします。
+5. 目のマークで表示 / 伏せ字を切り替え、「コピー」でクリップボードにコピーします。
 
 ## 使い方（Python 版 / Pythonista）
 1. `3wordPasGen.py` を Pythonista にコピーします。
